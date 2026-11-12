@@ -1,0 +1,25 @@
+Your previous response could not be parsed as the required JSON document.
+
+PARSE OR VALIDATION ERROR
+{{.Error}}
+
+PREVIOUS RESPONSE
+<previous_response>
+{{.Previous}}
+</previous_response>
+
+Fix only the JSON/schema problem while preserving the original meaning and
+evidence. Return ONE valid JSON object only, with no markdown fences and no
+prose. It must use the same schema as the extraction request:
+title, summary, knowledge_type, stack, tags, difficulty, status, problem,
+root_cause, diagnosis, commands, concepts, rejected_hypotheses, blind_spots,
+learning_value, solution, insights, pitfalls, verification, lessons,
+open_questions, artifacts, evidence, uncertain, confidence.
+
+Every evidence reference must use an event seq that appeared in the transcript.
+Do not invent execution results or file changes. Knowledge cards must include a
+minimal example, not only a concept name. Omit unsupported optional fields
+instead of fabricating them. Commands must be effective commands (change or
+confirm a hypothesis, reproduce, or verify); shell-quoting failures belong in
+pitfalls.
+{{if eq .Language "zh"}}Human-readable fields should remain in Simplified Chinese.{{else}}Human-readable fields should remain in English.{{end}}

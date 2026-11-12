@@ -1,0 +1,76 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "23 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    name: Go vulnerability check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Run govulncheck
+        working-directory: cli
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: go,javascript-typescript
+          queries: security-and-quality
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: cli/go.mod
+          cache-dependency-path: cli/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cli/web/package-lock.json
+
+      - name: Build frontend
+        working-directory: cli/web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Go
+        working-directory: cli
+        run: go build ./...
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4

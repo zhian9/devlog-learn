@@ -1,0 +1,57 @@
+# devlog-learn
+
+> devlog-learn turns local Claude Code and Codex session logs into traceable,
+> reviewable knowledge documents, Agent memory, and local Web UI views.
+
+## Source layout
+
+- `cli/cmd`: CLI commands
+- `cli/internal`: parsing, redaction, extraction, cache, rendering, indexing,
+  search, MCP, and local HTTP API
+- `cli/web`: React/Vite frontend
+- `docs`: architecture, privacy, and release documentation
+
+## Build
+
+```bash
+cd cli
+go build -o devlog-learn ./cmd
+./devlog-learn serve
+```
+
+Frontend source changes require:
+
+```bash
+cd cli/web
+npm ci
+npm run build
+```
+
+## Test
+
+```bash
+cd cli
+go vet ./...
+go test ./... -count=1
+go test ./... -race -count=1
+```
+
+## Important constraints
+
+- Tests must not call real model providers.
+- Session logs and generated outputs may contain sensitive data; never commit
+  local `.devlog-cache`, `.devlog-docs`, or `.devlog-cursor.json`.
+- Doc and index schemas are compatibility contracts; prefer additive changes.
+- CLI and Web writes share `<cache-dir>/.devlog.lock`.
+- Manifest pruning is explicit and only touches unchanged files owned by the
+  same output profile.
+- The project does not support Cursor IDE logs.
+
+## Documentation
+
+- `README.md`: project entry point
+- `cli/README.md`: full CLI and Web UI reference
+- `docs/ARCHITECTURE.md`: architecture and invariants
+- `docs/PRIVACY.md`: local data and model-provider boundaries
+- `SECURITY.md`: private vulnerability reporting
+- `CONTRIBUTING.md`: development and pull request workflow

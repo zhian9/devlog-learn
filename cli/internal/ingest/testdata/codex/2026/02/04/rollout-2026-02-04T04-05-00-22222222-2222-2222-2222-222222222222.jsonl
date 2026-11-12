@@ -1,0 +1,4 @@
+{"timestamp":"2026-02-04T04:05:00Z","type":"session_meta","payload":{"session_id":"codex-2","id":"codex-2","cwd":"D:\\work\\custom-demo","originator":"Codex CLI","cli_version":"0.155.0-alpha.9","thread_source":"user"}}
+{"timestamp":"2026-02-04T04:05:01Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Add File: x.txt\n+hi\n*** End Patch","call_id":"c1","status":"completed"}}
+{"timestamp":"2026-02-04T04:05:02Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c1","output":"Success. Updated the following files:\nA x.txt\n"}}
+{"timestamp":"2026-02-04T04:05:03Z","type":"response_item","payload":{"type":"mystery_item","x":1}}

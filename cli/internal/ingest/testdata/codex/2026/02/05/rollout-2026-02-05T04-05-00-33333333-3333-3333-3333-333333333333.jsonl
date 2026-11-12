@@ -1,0 +1,6 @@
+{"timestamp":"2026-02-05T04:05:00Z","type":"session_meta","payload":{"session_id":"codex-3","cwd":"D:\\work\\fallback-demo","originator":"Codex CLI","cli_version":"0.155.0-alpha.9","thread_source":"user"}}
+{"timestamp":"2026-02-05T04:05:01Z","type":"event_msg","payload":{"type":"user_message","message":"hello"}}
+{"timestamp":"2026-02-05T04:05:02Z","type":"event_msg","payload":{"type":"agent_reasoning","message":"thinking"}}
+{"timestamp":"2026-02-05T04:05:03Z","type":"event_msg","payload":{"type":"agent_message","message":"world"}}
+{"timestamp":"2026-02-05T04:05:04Z","type":"event_msg","payload":{"type":"task_started"}}
+{"timestamp":"2026-02-05T04:05:05Z","type":"event_msg","payload":{"type":"turn_aborted","reason":"interrupted"}}

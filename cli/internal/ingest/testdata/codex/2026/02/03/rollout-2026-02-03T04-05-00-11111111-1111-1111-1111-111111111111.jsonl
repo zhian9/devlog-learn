@@ -1,0 +1,12 @@
+{"timestamp":"2026-02-03T04:05:00Z","type":"session_meta","payload":{"session_id":"codex-1","id":"codex-1","cwd":"D:\\work\\codex-demo","originator":"Codex Desktop","cli_version":"0.155.0-alpha.9","thread_source":"user","source":"cli"}}
+{"timestamp":"2026-02-03T04:05:01Z","type":"turn_context","payload":{"cwd":"D:\\work\\codex-demo","sandbox_mode":"read-only"}}
+{"timestamp":"2026-02-03T04:05:02Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<app-context>desktop context noise"}]}}
+{"timestamp":"2026-02-03T04:05:03Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Please fix the failing build"}]}}
+{"timestamp":"2026-02-03T04:05:04Z","type":"response_item","payload":{"type":"reasoning","summary":[{"type":"summary_text","text":"Need to run the build"}]}}
+{"timestamp":"2026-02-03T04:05:05Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"go build ./...\",\"workdir\":\"D:\\\\work\\\\codex-demo\"}","call_id":"call-1"}}
+{"timestamp":"2026-02-03T04:05:06Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call-1","output":"Chunk ID: abc123\nWall time: 0.12 seconds\nProcess exited with code 1\nOutput:\nbuild failed\n"}}
+{"timestamp":"2026-02-03T04:05:07Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The build fails because of X."}]}}
+{"timestamp":"2026-02-03T04:05:08Z","type":"event_msg","payload":{"type":"user_message","message":"Please fix the failing build"}}
+{"timestamp":"2026-02-03T04:05:09Z","type":"event_msg","payload":{"type":"token_count"}}
+{"timestamp":"2026-02-03T04:05:10Z","type":"mystery-top-level"}
+{broken

@@ -1,0 +1,73 @@
+name: Bug report
+description: Report a reproducible defect with synthetic data.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste real Claude Code or Codex session logs, workspace paths,
+        credentials, customer data, or unredacted model output.
+
+        For security vulnerabilities, stop and use the private security link.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `devlog-learn --version`.
+      placeholder: devlog-learn 0.13.0
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: Windows 11 amd64, macOS 15 arm64, Ubuntu 24.04 amd64
+    validations:
+      required: true
+
+  - type: dropdown
+    id: interface
+    attributes:
+      label: Interface
+      options:
+        - CLI
+        - Local Web UI
+        - MCP server
+        - Build or release artifact
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and expected behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Provide the smallest command sequence and synthetic fixture.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include `--verbose` errors or logs after replacing sensitive values.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed real logs, credentials, customer data, and personal paths from this report.
+          required: true

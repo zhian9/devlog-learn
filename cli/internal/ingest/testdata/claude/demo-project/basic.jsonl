@@ -1,0 +1,10 @@
+{"type":"custom-title","customTitle":"Fix flaky test","sessionId":"sess-1","timestamp":"2026-01-02T03:04:05Z","cwd":"D:\\work\\demo","version":"2.1.268","gitBranch":"main"}
+{"type":"user","timestamp":"2026-01-02T03:04:06Z","sessionId":"sess-1","cwd":"D:\\work\\demo","message":{"role":"user","content":"Tests fail with a timeout"}}
+{"type":"assistant","timestamp":"2026-01-02T03:04:07Z","sessionId":"sess-1","cwd":"D:\\work\\demo","message":{"role":"assistant","model":"claude-test","content":[{"type":"thinking","thinking":"Need to inspect the test"},{"type":"text","text":"I will run the tests."},{"type":"tool_use","id":"tool-1","name":"Bash","input":{"command":"go test ./..."}}]}}
+{"type":"user","timestamp":"2026-01-02T03:04:08Z","sessionId":"sess-1","cwd":"D:\\work\\demo","toolUseResult":{"stdout":"FAIL","stderr":"","interrupted":false},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"tool-1","content":"FAIL","is_error":false}]}}
+{"type":"assistant","timestamp":"2026-01-02T03:04:09Z","sessionId":"sess-1","cwd":"D:\\work\\demo","message":{"role":"assistant","content":[{"type":"text","text":"The test is flaky."}]}}
+{"type":"assistant","timestamp":"2026-01-02T03:04:10Z","sessionId":"sess-1","cwd":"D:\\work\\demo","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"subagent note"}]}}
+{"type":"attachment","timestamp":"2026-01-02T03:04:11Z","sessionId":"sess-1","cwd":"D:\\work\\demo","attachment":{"type":"hook_success","hookName":"SessionStart"}}
+{"type":"file-history-delta","timestamp":"2026-01-02T03:04:11.500Z","sessionId":"sess-1","cwd":"D:\\work\\demo","trackingPath":"cli/go.mod","backup":{}}
+{"type":"mystery-event","timestamp":"2026-01-02T03:04:12Z","sessionId":"sess-1","cwd":"D:\\work\\demo"}
+{not json}

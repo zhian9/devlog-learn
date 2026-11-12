@@ -1,0 +1,31 @@
+# Local devlog-learn data
+.devlog-cache/
+.devlog-docs/
+.devlog-cursor.json
+
+# Local Codex configuration and history
+.codex/
+
+# Build output
+cli/devlog-learn
+cli/devlog-learn.exe
+cli/devlog-learn.exe~
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Frontend dependencies and caches
+cli/web/node_modules/
+cli/web/.vite/
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local archives and release output
+/dist/

@@ -1,0 +1,60 @@
+version: 2
+
+project_name: devlog-learn
+
+before:
+  hooks:
+    - cmd: npm ci
+      dir: cli/web
+    - cmd: npm run build
+      dir: cli/web
+
+builds:
+  - id: devlog-learn
+    dir: cli
+    main: ./cmd
+    binary: devlog-learn
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X devlog-learn/internal/version.ToolVersion={{ .Version }}
+
+archives:
+  - id: release-archive
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - THIRD_PARTY_NOTICES.md
+      - cli/README.md
+      - docs/*
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - "^style:"
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "devlog-learn {{ .Version }}"

@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose a focused capability or behavior change.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user problem before proposing implementation details.
+        Do not include real session logs or private project memory.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is difficult, unsafe, or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should users be able to do, and what should remain unchanged?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing commands, workarounds, or simpler options.
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Compatibility and privacy impact
+      description: Consider Doc schema, cache invalidation, output paths, local data, and model calls.
+    validations:
+      required: true
