@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { FileSearch, X } from 'lucide-react'
 import { api, formatDateTime } from '../api'
 import type { EventView } from '../types'
-import { ErrorBox, Loading } from './ui'
+import { CopyButton, ErrorBox, Loading } from './ui'
 
 const kindLabels: Record<string, string> = {
   user_text: '用户',
@@ -13,6 +13,20 @@ const kindLabels: Record<string, string> = {
   tool_result: '工具结果',
   meta: '元信息',
   unknown: '未知事件',
+}
+
+function eventCopyText(event: EventView): string {
+  const parts: string[] = []
+  if (event.tool_name) parts.push(`tool: ${event.tool_name}`)
+  if (event.text) parts.push(event.text)
+  if (event.tool_input_text) parts.push(`tool input:\n${event.tool_input_text}`)
+  else if (event.tool_input !== undefined) {
+    parts.push(`tool input:\n${JSON.stringify(event.tool_input, null, 2)}`)
+  }
+  if (event.tool_result) parts.push(`tool result:\n${event.tool_result}`)
+  const exec = execText(event)
+  if (exec) parts.push(`exec:\n${exec}`)
+  return parts.join('\n\n')
 }
 
 function execText(event: EventView): string | null {
@@ -96,6 +110,7 @@ export function EvidencePanel({
                   {event.time && <span className="event-time">{formatDateTime(event.time)}</span>}
                   {event.is_error && <span className="badge badge-red">错误</span>}
                   {event.truncated && <span className="badge badge-amber">已截断</span>}
+                  {eventCopyText(event) && <CopyButton text={eventCopyText(event)} label="复制" />}
                 </header>
 
                 {event.tool_name && (

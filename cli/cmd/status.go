@@ -75,6 +75,10 @@ type statusOutputs struct {
 	DigestExists     bool       `json:"digest_exists"`
 	DigestModifiedAt *time.Time `json:"digest_modified_at,omitempty"`
 	DigestStale      bool       `json:"digest_stale"`
+
+	ExperienceExists     bool       `json:"experience_exists"`
+	ExperienceModifiedAt *time.Time `json:"experience_modified_at,omitempty"`
+	ExperienceStale      bool       `json:"experience_stale"`
 }
 
 type statusProvider struct {
@@ -254,6 +258,14 @@ func inspectOutputs(outDir string, newestDoc *time.Time) statusOutputs {
 		out.DigestModifiedAt = &modified
 		out.DigestStale = newestDoc != nil && modified.Before(*newestDoc)
 	}
+
+	experiencePath := filepath.Join(outDir, "EXPERIENCE.md")
+	if stat, err := os.Stat(experiencePath); err == nil {
+		out.ExperienceExists = true
+		modified := stat.ModTime().UTC()
+		out.ExperienceModifiedAt = &modified
+		out.ExperienceStale = newestDoc != nil && modified.Before(*newestDoc)
+	}
 	return out
 }
 
@@ -320,6 +332,9 @@ func printStatus(out io.Writer, report statusReport) {
 		report.Outputs.Dir,
 		yesNo(report.Outputs.IndexExists), formatTimePtr(report.Outputs.IndexGeneratedAt), yesNo(report.Outputs.IndexStale),
 		yesNo(report.Outputs.DigestExists), formatTimePtr(report.Outputs.DigestModifiedAt), yesNo(report.Outputs.DigestStale))
+	line("experience %s  exists=%s updated=%s stale=%s",
+		report.Outputs.Dir,
+		yesNo(report.Outputs.ExperienceExists), formatTimePtr(report.Outputs.ExperienceModifiedAt), yesNo(report.Outputs.ExperienceStale))
 	for _, provider := range report.Providers {
 		line("provider  %-12s bin=%s(%s) dir=%s(%s files=%d)",
 			provider.Name, provider.Bin, foundOrMissing(provider.BinFound),

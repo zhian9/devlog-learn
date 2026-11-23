@@ -19,6 +19,7 @@
 - [核心能力](#核心能力)
 - [环境要求](#环境要求)
 - [快速开始](#快速开始)
+- [各种用法（按场景）](#各种用法按场景)
 - [本地 Web UI](#本地-web-ui)
 - [CLI 工作流](#cli-工作流)
 - [命令参考](#命令参考)
@@ -59,7 +60,8 @@
 | 人工审核 | `pending` / `approved` / `rejected` + 备注，不污染 Doc 契约 |
 | 问题闭环 | 跨文档聚合 open questions，解决状态保存在 sidecar |
 | 双 Markdown | Agent 版 `*.md` 与中文学习版 `*.learn.md` 互不覆盖 |
-| 索引与摘要 | 全局/项目 `index.json`、`README.md`、`AGENTS.md` |
+| 项目经历 | 同一目录的会话聚合为项目/实习经历，附静态复习清单；模型润色需显式 `synthesize` |
+| 索引与摘要 | 全局/项目 `index.json`、`README.md`、`AGENTS.md`、`EXPERIENCE.md` |
 | MCP | 只读 stdio Server：搜索、取文档、关联、项目列表 |
 | 隐私 | 本地规则脱敏；Web UI 只绑回环地址；不加载 CDN、不发送遥测 |
 
@@ -100,7 +102,7 @@ Windows 也可以直接双击 **`start-webui.cmd`**。它会启动 `serve` 并�
 3. 阅读后点“通过/驳回/待审”，写一句备注。
 4. 在“待办问题”里标记解决或重新打开。
 5. 在“提炼”里选择会话，确认后实时查看进度。
-6. 在“设置与导出”里一键生成 Markdown、索引和 `AGENTS.md`。
+6. 在“设置与导出”里一键生成 Markdown、索引、`AGENTS.md` 和项目经历 `EXPERIENCE.md`。
 
 只使用 CLI 也能完成同样的事情：
 
@@ -128,6 +130,284 @@ Windows 也可以直接双击 **`start-webui.cmd`**。它会启动 `serve` 并�
 | `--cache-dir` | `.devlog-cache` |
 | `--cursor` | `.devlog-cursor.json` |
 | `render/index/digest --out` | `.devlog-docs` |
+
+---
+
+## 各种用法（按场景）
+
+按“你现在想做什么”选择入口：
+
+| 场景 | 推荐入口 | 最小命令 / 页面 |
+|---|---|---|
+| 只浏览、搜索、审核已有文档 | Web UI | `devlog-learn serve` → 文档库 / 待办问题 |
+| 从会话里挑内容提炼 | Web UI | `serve` → 提炼 → 勾选会话或单个 Segment |
+| 第一次用，想先看再提炼 | CLI（零成本） | `dry-run` → `sessions` → `wizard` |
+| 一条命令跑完提炼 + 渲染 + 索引 | CLI | `run --provider all --since 7d --segments 1` |
+| 定时增量更新 | CLI + 计划任务 | `run --provider all --since 1d --segments 0` |
+| 给 Claude Code / Codex 按需检索 | MCP | `mcp` + 客户端配置 |
+| 给任意 Agent 一份记忆文件 | 文件 | `digest` → `.devlog-docs/AGENTS.md` |
+| 生成学习版 / Agent 版 Markdown | CLI | `render --profile learning` / 默认 agent |
+| 把同一目录的会话整理成项目/实习经历 | CLI / Web UI | `experience render` / `serve` → 项目经历 |
+| 标注经历类型、生成复习清单 | CLI | `experience set` / `experience checklist` |
+| 查历史问题、关联文档、健康状态 | CLI | `search` / `related` / `status` / `questions` |
+| 做 RAG 或自定义脚本 | Doc JSON | `docs/*.json`、`search --json`、`projects --json` |
+| 多个仓库互不干扰 | 多缓存目录 | `--cache-dir` 或项目级 `.devlog-learn.json` |
+| 开发前端 / 后端 | 源码 | `npm run dev`、`go test ./...` |
+
+> 下文的命令默认在 `cli/` 目录执行。`extract` / `run` / `wizard` 的 `--provider` 默认是 `claude-code`；要同时处理 Codex，请显式加 `--provider all`。
+
+### 1. 只阅读和人工闭环（不调用模型）
+
+```bash
+./devlog-learn.exe serve
+# 或：./devlog-learn.exe serve --no-open --addr 127.0.0.1:0
+```
+
+- **文档库**：中文搜索；项目、审核状态、知识类型、解决状态、学习价值、生命周期、标签筛选。徽章和标签都可以直接点击下钻。
+- **文档详情**：学习视图 / Agent Markdown / JSON；点 `E1`、`E2` 回看原始事件、工具输入输出和退出码。
+- **人工审核**：通过 / 驳回 / 待审 + 备注；只改 `docs/<id>.json`，不删文件。
+- **待办问题**：跨文档聚合，标记解决或重新打开；状态保存在 `<cache-dir>/questions.json`。
+- **设置与导出**：生成 Markdown、索引、`AGENTS.md` 和项目经历 `EXPERIENCE.md`；路径可直接复制。
+- 整个浏览过程不调用模型；只有审核、问题状态和导出会写缓存/输出。
+
+CLI 等价操作：
+
+```bash
+./devlog-learn.exe review --list --status pending
+./devlog-learn.exe review <doc-id> --status approved --note "verified locally"
+./devlog-learn.exe questions
+./devlog-learn.exe questions resolve <question-id> --note "fixed in v0.12"
+./devlog-learn.exe questions reopen <question-id>
+```
+
+### 2. 在 Web UI 里提炼（日常推荐）
+
+1. 打开“提炼”，选择来源（Claude Code / Codex / 全部）和时间范围（1d / 7d / 30d / 全部）。
+2. 等待扫描完成（只解析日志，不调用模型；首次可能需要数秒到数十秒）。
+3. 勾选整个会话，或展开“片段”只勾选某个 Segment；支持半选和“全选当前列表”。
+4. 点“开始提炼”，确认框会明确提示“只有未命中缓存的 Segment 才会调用本地模型”。
+5. 通过 SSE 实时看进度，可取消；失败后可按失败 Segment 重试。
+
+注意：
+
+- 同一个 `serve` 进程同时只允许一个提炼 job；job 历史只在内存，重启后消失。
+- 关闭窗口不会删除缓存，也不会停止正在运行的 `serve` 进程（需要 Ctrl+C 或关闭控制台）。
+- 缓存命中不会重复调用模型；`--force`/强制重提才会绕过缓存。
+
+### 3. 第一次用：先看有什么（零成本）
+
+```bash
+# 发现/解析诊断，不调用模型、不写缓存
+./devlog-learn.exe ingest --provider all --since 7d --limit 2 --show-events
+
+# 列出可选会话与 Segment，拿到 selector / segment-id
+./devlog-learn.exe sessions --provider all --since 7d
+./devlog-learn.exe sessions --provider all --since 7d --json
+
+# 解析 → 切分 → 脱敏 → Prompt 预算预览，不写 cursor/cache
+./devlog-learn.exe dry-run --provider all --since 7d --limit 2 --show-drops
+```
+
+### 4. 命令行小步提炼
+
+```bash
+# 默认只提炼 1 个 Segment，避免一次产生大量模型调用
+./devlog-learn.exe extract --provider all --since 7d --segments 1
+
+# 明确选择整个会话
+./devlog-learn.exe extract --provider all --session claude-code:<session-id>
+
+# 明确选择单个 Segment
+./devlog-learn.exe extract --provider all --segment <segment-id>
+
+# 交互式：按编号多选（1,3 / 1-3 / all），确认后执行完整流程
+./devlog-learn.exe wizard --provider all --since 7d
+```
+
+- `--segments 0` 表示全部；默认 1。显式 `--session` / `--segment` 时忽略 `--segments`。
+- `extract` 未指定 `--out` 时把本次 Doc JSON 数组写到 stdout；要落盘用 `--out <dir>`。规范结果始终在 `<cache-dir>/docs/`。
+- `--full` 忽略 cursor 但仍复用缓存；`--force` 忽略缓存并强制调用模型（会产生费用）。
+- `--keep-raw` 保存失败的模型响应（保存前已脱敏）。
+- 每个真实模型调用会在 stderr 打印 `usage:`，结束打印 `tokens:` 汇总。
+- `--lang en` 可生成英文 Doc；默认中文。
+
+### 5. 一条命令跑完（提炼 + 渲染 + 索引）
+
+```bash
+./devlog-learn.exe run --provider all --since 7d --segments 1 --out .devlog-docs
+```
+
+- 等价于 `extract → render(agent) → index`。
+- 即使本次没有新 Segment，也会重新渲染 active Doc 并重建索引。
+- `--prune` 会清理 `.devlog-manifest.json` 中登记、且内容 hash 未变化的旧输出；不会删除手改文件或未登记文件。
+- `run` 只渲染 Agent 版；学习版需要额外执行 `render --profile learning`。
+
+### 6. 生成 Markdown、索引、学习案例和 AGENTS.md
+
+```bash
+./devlog-learn.exe render --profile agent --out .devlog-docs
+./devlog-learn.exe render --profile learning --out .devlog-docs
+./devlog-learn.exe index --out .devlog-docs
+./devlog-learn.exe digest --out .devlog-docs --review approved --limit 20
+```
+
+- **Agent 版**：`<out>/<project>/<date>-<slug>.md`，带 YAML front matter。
+- **学习版**：`*.learn.md`，包含定位路径、被排除的假设、知识点卡片、自测题等；不会覆盖 Agent 版。
+- **索引**：`index.json`、`README.md`、每个项目的索引；先 `render` 再 `index`，链接才指向真实文件。
+- **AGENTS.md**：给 Agent 的紧凑记忆摘要；默认不覆盖非本工具生成的文件，确认后加 `--force`。
+- `--include-stale` 才会渲染 stale 文档；`--prune` 只清理本 profile 的旧文件。
+
+### 7. 给 Agent 用：MCP（按需检索）
+
+```bash
+# Claude Code（建议用绝对路径，-s user 表示全局可用）
+claude mcp add -s user devlog-learn -- "D:\software\traceback\cli\devlog-learn.exe" mcp --cache-dir "D:\software\traceback\cli\.devlog-cache"
+```
+
+```toml
+# Codex: ~/.codex/config.toml
+[mcp_servers.devlog-learn]
+command = "D:/software/traceback/cli/devlog-learn.exe"
+args = ["mcp", "--cache-dir", "D:/software/traceback/cli/.devlog-cache"]
+```
+
+工具：`search_docs`、`get_doc`、`related_docs`、`list_projects`。
+
+- 只读：不提炼、不写缓存、不调用模型；只服务 active Doc。
+- `--review approved` 只看人工通过的内容；`--project <name>` 限定项目。
+- `--project auto` 取的是 MCP 进程 cwd 的目录名，跨项目使用容易指错，建议显式传项目名或留空。
+- 在 Claude Code 里用 `/mcp` 查看连接状态；配置改动后需要重连。
+- 详细参数和调试方法见 [`mcp`](#mcp)。
+
+### 8. 给 Agent 用：AGENTS.md（零基础设施）
+
+```bash
+./devlog-learn.exe digest --out .devlog-docs --review approved
+```
+
+把 `.devlog-docs/AGENTS.md` 放进仓库根目录，或直接让 Agent 读取该文件。适合不支持 MCP 的客户端；用 `--project` / `--limit` 控制摘要大小。
+
+### 9. 检索、关联与健康检查（只读）
+
+```bash
+./devlog-learn.exe search "timer localStorage" --project test-1
+./devlog-learn.exe search "render fail" --review approved --tag go --json
+./devlog-learn.exe projects --json
+./devlog-learn.exe status --json
+./devlog-learn.exe related <doc-id> --json
+./devlog-learn.exe questions --status all --json
+```
+
+- `search` 是词法检索（ASCII 词 + 中文 bigram），不依赖 embedding；空 query 返回最近文档。
+- `--tag` 可重复，要求全部命中。
+- `--json` 适合脚本/CI 集成。
+- `status` 只读检查缓存、cursor、索引/AGENTS.md 新鲜度和 Provider 探测，不会创建缓存。
+
+### 10. 定时增量更新
+
+建议先写一个包装脚本，避免计划任务里的引号和 PATH 问题：
+
+```bat
+:: devlog-daily.cmd
+@echo off
+cd /d D:\software\traceback\cli
+devlog-learn.exe run --provider all --since 1d --segments 0 >> .devlog-daily.log 2>&1
+```
+
+```bat
+:: 每天 09:00 执行
+schtasks /Create /SC DAILY /TN devlog-learn /TR "D:\software\traceback\cli\devlog-daily.cmd" /ST 09:00
+```
+
+Linux / macOS：
+
+```cron
+0 9 * * * cd /path/to/project && /path/to/devlog-learn run --provider all --since 1d --segments 0 >> /tmp/devlog-learn.log 2>&1
+```
+
+注意：
+
+- 计划任务的环境变量/PATH 可能不含 `claude` / `codex`；用 `--claude-bin` / `--codex-bin` 指定绝对路径。
+- 费用控制：先用 `--segments 1` 或 `dry-run` 验证；缓存命中不会调用模型。
+- `run` 会持有 `.devlog.lock`；与 Web UI 的审核/导出并发时会返回 409 或报错，这是有意的保护。
+- 增量由文件 SHA-256 cursor 决定；`--since` 控制读取范围，二者不冲突。
+
+### 11. 多个仓库 / 多份缓存隔离
+
+```bash
+./devlog-learn.exe run \
+  --cache-dir D:/devlog-cache/project-a \
+  --out D:/devlog-docs/project-a \
+  --provider all --since 7d
+```
+
+或在项目根目录放 `.devlog-learn.json`：
+
+```json
+{
+  "cache_dir": ".devlog-cache",
+  "out": ".devlog-docs",
+  "provider": "all",
+  "since": "7d"
+}
+```
+
+- 每个仓库独立缓存、cursor 和输出，互不污染。
+- 也可以共享一份缓存，用 MCP / `digest` 的 `--project` 过滤。
+- 配置优先级：**显式 flag > 环境变量 > 项目配置 > 用户配置 > 内置默认值**。详见 [配置](#配置)。
+
+### 12. 调试与开发
+
+```bash
+# 看解析/丢弃/事件预览
+./devlog-learn.exe dry-run --provider all --since 7d --show-drops --show-events
+./devlog-learn.exe ingest --provider all --since 7d --json --show-events
+
+# 更详细的日志
+./devlog-learn.exe -v extract --provider all --since 7d --segments 1
+
+# 保留失败响应（已脱敏）
+./devlog-learn.exe extract --provider all --segments 1 --keep-raw
+
+# 测试与前端开发
+go vet ./...
+go test ./... -count=1
+cd web && npm run dev     # 另开终端：./devlog-learn.exe serve --no-open
+```
+
+### 13. 成本与隐私速记
+
+- 只有 `extract`、`run`、`wizard`、`experience synthesize` 和 Web UI 的“提炼”会调用模型；其余命令（包括 `experience show/render/list/checklist`）都是只读或确定性输出。
+- 默认一次只提炼 1 个 Segment；`--force` 会绕过缓存，谨慎使用。
+- 会话日志在本机解析；Web UI 只绑定回环地址并要求进程级 token；没有遥测。
+- 脱敏是尽力而为；不要把 `.devlog-cache/`、`.devlog-docs/`、`.devlog-cursor.json` 提交到公开仓库。
+- 详细边界见 [隐私与安全](#隐私与安全) 和 [`docs/PRIVACY.md`](../docs/PRIVACY.md)。
+
+### 14. 项目经历 / 实习经验与复习清单
+
+把同一项目目录下已经提炼成 Doc 的会话聚合为一份项目级经历：
+
+```bash
+# 只读：先看有哪些项目、当前类型和建议类型
+./devlog-learn.exe experience list
+
+# 人工确认类型与展示信息（写入 <cache-dir>/experiences.json）
+./devlog-learn.exe experience set --project my-app --kind internship \
+  --org ACME --role "Backend Intern" --start 2025-07 --end 2025-09
+
+# 查看 Markdown 或只打印复习清单
+./devlog-learn.exe experience show --project my-app
+./devlog-learn.exe experience checklist --project my-app
+
+# 写出 <out>/<project>/EXPERIENCE.md 与 <out>/EXPERIENCE.md
+./devlog-learn.exe experience render --out .devlog-docs
+```
+
+- 类型只做**建议**（项目名/目录包含 `intern`、`internship`、`placement` 或 `实习`），最终以 `set` 为准；也可以直接用 Web UI 的“项目经历”页阅读。
+- 经历只聚合已经提炼的 Doc；没有文档时先运行 `extract` / `run`。
+- Markdown 里的文档链接指向 agent profile 的 `*.md`；如果还没生成，先运行 `render` 或 `run`。
+- 复习清单是静态 `- [ ]` 列表，不记录完成状态，也不安排间隔重复。
+- 默认不调用模型。只有显式执行 `experience synthesize --project my-app` 才会把已脱敏的 Doc 摘要交给本地 `claude` / `codex` CLI，结果缓存并在 Markdown 中标注为“模型补充（未验证）”。
 
 ---
 
@@ -162,11 +442,12 @@ Windows 也可以直接双击 **`start-webui.cmd`**。它会启动 `serve` 并�
 | 页面 | 作用 |
 |---|---|
 | **概览** | 文档/待审核/未解决问题/缓存大小、Provider 探测、输出新鲜度、最近文档 |
-| **文档库** | 中文搜索；项目、审核状态、生命周期、标签筛选；标签可点击且为 AND 关系 |
+| **文档库** | 中文搜索；项目、审核状态、知识类型、解决状态、学习价值、生命周期、标签筛选；徽章与标签均可点击 |
 | **文档详情** | 学习视图、Agent Markdown、原始 JSON；证据抽屉；审核；相关问题；相关文档 |
-| **提炼** | 选择来源/时间 → 选择会话 → 确认 → 实时进度 → 取消 / 重试失败片段 |
+| **项目经历** | 按项目聚合的「项目经历/实习经验」、关键工作、难点、结果、STAR 故事、静态复习清单、文档索引；只读，不调用模型 |
+| **提炼** | 选择来源/时间 → 按会话或单个 Segment 勾选 → 确认 → 实时进度 → 取消 / 重试失败片段 |
 | **待办问题** | 跨文档聚合未解决问题，解决状态保存在 `<cache-dir>/questions.json` |
-| **设置与导出** | 本地路径、Provider 状态、输出新鲜度、生成 Markdown/索引/AGENTS.md |
+| **设置与导出** | 本地路径、Provider 状态、输出新鲜度、生成 Markdown/索引/AGENTS.md/EXPERIENCE.md |
 
 ### 学习视图
 
@@ -191,7 +472,7 @@ Windows 也可以直接双击 **`start-webui.cmd`**。它会启动 `serve` 并�
 ### 提炼流程与成本保护
 
 1. 前端调用 `/api/sessions` 扫描本地日志（不调用模型），列出会话与 Segment。
-2. 用户选择整个会话；界面显示 Segment 数和已提炼数量。
+2. 用户可以勾选整个会话，也可以展开后只勾选单个 Segment；界面显示已选 Segment 数和已提炼数量。
 3. 点击“开始提炼”后弹出确认框，明确提示“未命中缓存的 Segment 才会调用本地模型”。
 4. 服务端启动 job，通过 SSE 推送 `scan`、`selected`、每个 `segment` 以及最终 `done/failed/canceled`。
 5. 支持取消；失败后可按失败 Segment 重试。
@@ -434,6 +715,24 @@ Windows 也可以直接双击 **`start-webui.cmd`**。它会启动 `serve` 并�
 
 按项目汇总 active Doc 与 review 计数。
 
+### `experience`
+
+```bash
+./devlog-learn.exe experience                 # 等价于 experience list
+./devlog-learn.exe experience list --json
+./devlog-learn.exe experience show --project my-app
+./devlog-learn.exe experience set --project my-app --kind internship --org ACME --role "Backend Intern"
+./devlog-learn.exe experience unset --project my-app
+./devlog-learn.exe experience checklist --project my-app
+./devlog-learn.exe experience render --out .devlog-docs --prune
+./devlog-learn.exe experience synthesize --project my-app   # 唯一会调用模型的 experience 子命令
+```
+
+- `list` / `show` / `checklist` 只读，不会创建 cache 或调用模型。
+- `render` 是确定性输出，只写 `EXPERIENCE.md`（profile=`experience`），不会覆盖 agent/learning/index 的文件。
+- 人工类型与组织/角色/时间保存在 `<cache-dir>/experiences.json`；`set`/`unset`/`render`/`synthesize` 会获取缓存写锁。
+- `synthesize` 只发送 Doc 摘要（title/summary/root cause/lessons），不发送原始会话或证据全文；输出缓存在 `<cache-dir>/experience-synthesis/`，渲染时标注“未验证”。
+
 ### `status`
 
 ```bash
@@ -441,13 +740,13 @@ Windows 也可以直接双击 **`start-webui.cmd`**。它会启动 `serve` 并�
 ./devlog-learn.exe status --json
 ```
 
-只读报告：缓存大小、active/stale、review、未解决问题、cursor、索引/AGENTS.md 新鲜度、Provider 二进制与目录。不会创建 cache，不调用模型。
+只读报告：缓存大小、active/stale、review、未解决问题、cursor、索引/AGENTS.md/EXPERIENCE.md 新鲜度、Provider 二进制与目录。不会创建 cache，不调用模型。
 
 ### `questions`
 
 ```bash
 ./devlog-learn.exe questions
-./devlog-learn.exe questions --project cli --all
+./devlog-learn.exe questions --project cli --status all
 ./devlog-learn.exe questions resolve <question-id> --note "fixed in v0.12"
 ./devlog-learn.exe questions reopen <question-id>
 ```
@@ -652,7 +951,7 @@ Agent 使用约定：把 Doc 当历史记忆而非当前事实；优先 `approve
 ./devlog-learn.exe digest --out .devlog-docs
 ```
 
-任何能读文件的 Agent 都可以直接使用 `.devlog-docs/AGENTS.md`。Web UI 的“设置与导出”也能同时生成它。
+任何能读文件的 Agent 都可以直接使用 `.devlog-docs/AGENTS.md`。Web UI 的“设置与导出”也能同时生成它和项目经历 `EXPERIENCE.md`。
 
 ### 2. MCP（按需检索）
 
@@ -740,10 +1039,11 @@ cli/
     cache/              缓存、docs、segments
     cursor/             SHA-256 文件指纹
     extract/            Doc Schema、Prompt、LLM Client、证据校验
-    render/             Agent/学习版 Markdown 与路径规划
+    render/             Agent/学习版/经历 Markdown 与路径规划
     index/              索引与 related
-    export/             render + index 的共享导出层
+    export/             render + index + experience 的共享导出层
     search/             词法检索与项目统计
+    experience/         项目经历聚合、类型 sidecar、静态复习清单、可选合成
     questions/          人工问题解决状态 sidecar
     digest/             AGENTS.md 摘要（CLI 与 Web UI 共用）
     manifest/           输出文件归属、hash 与安全 prune
@@ -843,5 +1143,6 @@ Vite 只代理 `/api`；token 由前端从 URL 取出后通过 `X-Devlog-Token` 
 - 两个不同项目名清洗后若落到同一目录，会合并到同一项目索引。
 - `mcp` / `digest` / `search` / `projects` / `status` 是只读视图：不会触发提炼，也不会替你审核文档。
 - `questions` 的状态在 `<cache-dir>/questions.json`；删除整个缓存目录会同时丢失 Doc 和问题状态。
-- 不做掌握度/间隔复习；学习模板的自测题只折叠答案，不建复习系统。
+- 不做掌握度/间隔复习调度；学习模板的自测题只折叠答案，`experience` 生成的是静态复习清单，不记录完成状态、不安排间隔重复。
+- `experience` 只聚合已经提炼成 Doc 的会话，不直接读取未提炼的原始会话；也不会自动推断组织/职位（只给类型建议，最终由人工 `set`）。
 - `status` 只统计本地文件，不解析会话日志；需要未提炼 Segment 明细时用 `sessions`。

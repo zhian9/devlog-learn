@@ -189,6 +189,39 @@ func TestReviewAndQuestions(t *testing.T) {
 	}
 }
 
+func TestDocsFacetFilters(t *testing.T) {
+	server, _, _ := newTestServer(t)
+
+	cases := []struct {
+		path string
+		want int
+	}{
+		{path: "/api/docs?kind=bug_fix", want: 1},
+		{path: "/api/docs?kind=architecture", want: 0},
+		{path: "/api/docs?status=resolved", want: 1},
+		{path: "/api/docs?status=unresolved", want: 0},
+		{path: "/api/docs?kind=bug_fix&status=resolved", want: 1},
+	}
+	for _, tc := range cases {
+		response := get(t, server, tc.path)
+		var list DocListResponse
+		decode(t, response, &list)
+		if list.Total != tc.want {
+			t.Fatalf("%s total = %d, want %d", tc.path, list.Total, tc.want)
+		}
+	}
+}
+
+func TestEmptyQuestionsSerializeAsArray(t *testing.T) {
+	server, _, _ := newTestServer(t)
+
+	response := get(t, server, "/api/questions?status=resolved")
+	body := strings.TrimSpace(response.Body.String())
+	if !strings.Contains(body, `"entries":[]`) {
+		t.Fatalf("empty questions must serialize as [] not null: %s", body)
+	}
+}
+
 func TestExportWritesBothProfilesAndIndex(t *testing.T) {
 	server, _, _ := newTestServer(t)
 	response := post(t, server, "/api/export", `{"profile":"both","include_stale":false,"digest":true,"digest_review":"any"}`)

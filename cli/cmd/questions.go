@@ -38,7 +38,7 @@ questions from the agent-facing AGENTS.md.
 
 Examples:
   devlog-learn questions
-  devlog-learn questions --project cli --all
+  devlog-learn questions --project cli --status all
   devlog-learn questions resolve q_ab12cd34ef56 --note "fixed in v0.9"
   devlog-learn questions reopen q_ab12cd34ef56`,
 		Args: cobra.NoArgs,

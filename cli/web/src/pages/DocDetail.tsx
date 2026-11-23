@@ -38,6 +38,24 @@ import {
 
 type Tab = 'learn' | 'markdown' | 'json'
 
+// Related-document reasons are encoded as "facet:value" (tag/type/project/stack)
+// by internal/index. Turn them into the matching library filter.
+function relatedReasonUrl(reason: string): string {
+  const split = reason.indexOf(':')
+  const facet = split >= 0 ? reason.slice(0, split) : ''
+  const value = split >= 0 ? reason.slice(split + 1) : reason
+  switch (facet) {
+    case 'tag':
+      return `/library?tag=${encodeURIComponent(value)}`
+    case 'type':
+      return `/library?kind=${encodeURIComponent(value)}`
+    case 'project':
+      return `/library?project=${encodeURIComponent(value)}`
+    default:
+      return `/library?q=${encodeURIComponent(value)}`
+  }
+}
+
 export function DocDetail() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
@@ -93,7 +111,13 @@ export function DocDetail() {
           <ArrowLeft size={15} /> 返回文档库
         </Link>
         <div className="detail-meta-line">
-          <span>{doc.project}</span>
+          <Link className="inline-link" to={`/library?project=${encodeURIComponent(doc.project)}`}>
+            {doc.project}
+          </Link>
+          <span>·</span>
+          <Link className="inline-link" to={`/experiences?project=${encodeURIComponent(doc.project)}`}>
+            经历
+          </Link>
           <span>·</span>
           <span>{doc.source}</span>
           <span>·</span>
@@ -106,14 +130,42 @@ export function DocDetail() {
       <header className="detail-header">
         <div className="detail-title-block">
           <div className="badge-row">
-            <Badge tone={reviewTone(doc.review_status)}>{reviewLabel(doc.review_status)}</Badge>
-            <Badge tone={statusTone(doc.status)}>{statusLabel(doc.status)}</Badge>
-            <Badge tone="outline">{kindLabel(doc.knowledge_type)}</Badge>
+            <Badge
+              tone={reviewTone(doc.review_status)}
+              to={`/library?review=${encodeURIComponent(doc.review_status)}`}
+              title="在文档库中查看同审核状态"
+            >
+              {reviewLabel(doc.review_status)}
+            </Badge>
+            <Badge
+              tone={statusTone(doc.status)}
+              to={`/library?status=${encodeURIComponent(doc.status)}`}
+              title="在文档库中查看同解决状态"
+            >
+              {statusLabel(doc.status)}
+            </Badge>
+            <Badge
+              tone="outline"
+              to={`/library?kind=${encodeURIComponent(doc.knowledge_type)}`}
+              title="在文档库中查看同知识类型"
+            >
+              {kindLabel(doc.knowledge_type)}
+            </Badge>
             <Badge tone="outline">{difficultyLabel(doc.difficulty)}</Badge>
             {doc.learning_value && (
-              <Badge tone="violet">{learningValueLabel(doc.learning_value)}</Badge>
+              <Badge
+                tone="violet"
+                to={`/library?learning=${encodeURIComponent(doc.learning_value)}`}
+                title="在文档库中查看同学习价值"
+              >
+                {learningValueLabel(doc.learning_value)}
+              </Badge>
             )}
-            {doc.lifecycle === 'stale' && <Badge tone="red">已过期</Badge>}
+            {doc.lifecycle === 'stale' && (
+              <Badge tone="red" to="/library?lifecycle=stale">
+                已过期
+              </Badge>
+            )}
           </div>
           <h1>{doc.title}</h1>
           {doc.summary && <p className="detail-summary">{doc.summary}</p>}
@@ -272,7 +324,21 @@ export function DocDetail() {
               </div>
               <div>
                 <dt>项目</dt>
-                <dd>{doc.project}</dd>
+                <dd>
+                  <Link
+                    className="inline-link"
+                    to={`/library?project=${encodeURIComponent(doc.project)}`}
+                  >
+                    {doc.project}
+                  </Link>
+                  {' · '}
+                  <Link
+                    className="inline-link"
+                    to={`/experiences?project=${encodeURIComponent(doc.project)}`}
+                  >
+                    经历
+                  </Link>
+                </dd>
               </div>
               <div>
                 <dt>时间</dt>
@@ -338,9 +404,14 @@ export function DocDetail() {
                     <span>{item.title}</span>
                     <span className="related-reasons">
                       {item.reasons.slice(0, 3).map((reason) => (
-                        <span className="tag" key={reason}>
+                        <Link
+                          className="tag"
+                          key={reason}
+                          to={relatedReasonUrl(reason)}
+                          title={`在文档库中按 ${reason} 筛选`}
+                        >
                           {reason}
-                        </span>
+                        </Link>
                       ))}
                     </span>
                   </Link>

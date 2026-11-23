@@ -137,6 +137,42 @@ func TestWriteExcludesStaleAndWritesProjectIndexes(t *testing.T) {
 	}
 }
 
+func TestReadmeLinksExperienceFilesWhenPresent(t *testing.T) {
+	doc := indexDoc("aaa111", "Demo Project", "Fix build", indexTime, "build")
+	store := saveDocs(t, doc)
+	infos, _ := store.ListDocs()
+	out := t.TempDir()
+
+	projectDir := filepath.Join(out, "Demo-Project")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(out, "EXPERIENCE.md"), []byte("# experiences\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "EXPERIENCE.md"), []byte("# demo\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := Write(out, infos, indexTime); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	global, err := os.ReadFile(filepath.Join(out, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(global), "[EXPERIENCE.md](EXPERIENCE.md)") {
+		t.Fatalf("global README missing experience link:\n%s", global)
+	}
+	project, err := os.ReadFile(filepath.Join(projectDir, "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(project), "[EXPERIENCE.md](EXPERIENCE.md)") {
+		t.Fatalf("project README missing experience link:\n%s", project)
+	}
+}
+
 func TestWriteEmptyIndex(t *testing.T) {
 	out := t.TempDir()
 	report, err := Write(out, nil, indexTime)

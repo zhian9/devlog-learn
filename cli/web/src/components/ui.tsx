@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { AlertTriangle, Check, Copy, Loader2, X } from 'lucide-react'
 
 export type Tone =
@@ -14,13 +15,23 @@ export function Badge({
   children,
   tone = 'neutral',
   title,
+  to,
 }: {
   children: ReactNode
   tone?: Tone
   title?: string
+  to?: string
 }) {
+  const className = `badge badge-${tone}`
+  if (to) {
+    return (
+      <Link className={`${className} badge-link`} to={to} title={title}>
+        {children}
+      </Link>
+    )
+  }
   return (
-    <span className={`badge badge-${tone}`} title={title}>
+    <span className={className} title={title}>
       {children}
     </span>
   )
@@ -55,23 +66,33 @@ export function StatCard({
   detail,
   icon,
   tone = 'neutral',
+  to,
 }: {
   label: string
   value: ReactNode
   detail?: ReactNode
   icon?: ReactNode
   tone?: Tone
+  to?: string
 }) {
-  return (
-    <div className={`stat-card stat-${tone}`}>
+  const content = (
+    <>
       <div className="stat-top">
         <span>{label}</span>
         {icon && <span className="stat-icon">{icon}</span>}
       </div>
       <strong>{value}</strong>
       {detail && <div className="stat-detail">{detail}</div>}
-    </div>
+    </>
   )
+  if (to) {
+    return (
+      <Link className={`stat-card stat-${tone} stat-link`} to={to}>
+        {content}
+      </Link>
+    )
+  }
+  return <div className={`stat-card stat-${tone}`}>{content}</div>
 }
 
 export function EmptyState({
@@ -135,24 +156,46 @@ export function Banner({
   )
 }
 
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // Permission can be denied in an --app window; fall through to execCommand.
+  }
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    const copied = document.execCommand('copy')
+    area.remove()
+    return copied
+  } catch {
+    return false
+  }
+}
+
 export function CopyButton({ text, label }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
+  const [state, setState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const finish = (next: 'copied' | 'error') => {
+    setState(next)
+    window.setTimeout(() => setState('idle'), 1600)
+  }
   return (
     <button
-      className="copy-button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text)
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1400)
-        } catch {
-          setCopied(false)
-        }
-      }}
-      title="复制"
+      className={`copy-button${state === 'error' ? ' copy-error' : ''}`}
+      onClick={async () => finish((await writeClipboard(text)) ? 'copied' : 'error')}
+      title={state === 'error' ? '复制失败，请手动选择文本' : '复制'}
+      aria-live="polite"
     >
-      {copied ? <Check size={13} /> : <Copy size={13} />}
-      {label && <span>{copied ? '已复制' : label}</span>}
+      {state === 'copied' ? <Check size={13} /> : <Copy size={13} />}
+      {label && <span>{state === 'copied' ? '已复制' : state === 'error' ? '复制失败' : label}</span>}
     </button>
   )
 }

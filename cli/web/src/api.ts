@@ -4,6 +4,8 @@ import type {
   DocDetailResponse,
   DocListResponse,
   EventsResponse,
+  Experience,
+  ExperiencesResponse,
   ExportResponse,
   ExtractJobRequest,
   JobSnapshot,
@@ -81,6 +83,9 @@ export const api = {
     review?: string
     lifecycle?: string
     sort?: string
+    kind?: string
+    status?: string
+    learning?: string
     tag?: string[]
   }) => request<DocListResponse>(`/api/docs${query(params)}`),
   doc: (id: string) => request<DocDetailResponse>(`/api/docs/${encodeURIComponent(id)}`),
@@ -102,6 +107,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ status, note }),
     }),
+  experiences: () => request<ExperiencesResponse>('/api/experiences'),
+  experience: (project: string) =>
+    request<Experience>(`/api/experiences/${encodeURIComponent(project)}`),
   questions: (status: string) =>
     request<QuestionsResponse>(`/api/questions${query({ status })}`),
   resolveQuestion: (id: string, note: string) =>
@@ -123,6 +131,7 @@ export const api = {
     digest_project?: string
     digest_limit?: number
     force_digest?: boolean
+    experience?: boolean
   }) =>
     request<ExportResponse>('/api/export', {
       method: 'POST',

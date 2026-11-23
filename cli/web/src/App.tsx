@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Dashboard } from './pages/Dashboard'
 import { DocDetail } from './pages/DocDetail'
+import { Experiences } from './pages/Experiences'
 import { Extract } from './pages/Extract'
 import { Library } from './pages/Library'
 import { Questions } from './pages/Questions'
@@ -32,6 +33,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="library" element={<Library />} />
+        <Route path="experiences" element={<Experiences />} />
         <Route path="docs/:id" element={<DocDetail />} />
         <Route path="extract" element={<Extract />} />
         <Route path="questions" element={<Questions />} />

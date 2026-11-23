@@ -7,6 +7,41 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Project experience aggregation: group extracted Docs under the same project
+  into a project experience (项目经历) or internship experience (实习经验), with
+  a deterministic timeline, highlights, challenges, outcomes, STAR stories, and
+  a static review checklist.
+- `experience list|show|render|set|unset|checklist` CLI commands and a read-only
+  Web UI "项目经历" page.
+- Optional `experience synthesize` model supplement, cached separately and
+  rendered as an explicitly unverified section; unknown `doc_id` references are
+  dropped.
+- `experiences.json` sidecar for human-owned kind/organization/role/period, with
+  automatic kind suggestions that never override manual metadata.
+- Experience generation from the Web UI export flow, plus `EXPERIENCE.md`
+  freshness in `status` and links from generated README/index files.
+- Document library facets for knowledge type, resolution status, and learning
+  value, with clickable badges, dashboard cards, and knowledge-type pills.
+- Segment-level selection on the Web UI extraction page, including
+  indeterminate session checkboxes and exact partial-selection requests.
+- Route-level error boundary so a single page failure keeps the sidebar usable
+  instead of blanking the whole app.
+- Copy buttons for configured paths, session selectors, and evidence events.
+
+### Fixed
+
+- Empty question results were serialized as `null`, which crashed the Web UI
+  when a status filter had no entries.
+- Clipboard copies now fall back to `execCommand` and report failure instead of
+  silently doing nothing.
+
+### Changed
+
+- Session rows and document cards expose larger click targets; the brand links
+  home and related-document reasons link to matching library filters.
+
 ## [0.13.0] - 2026-11-12
 
 ### Added

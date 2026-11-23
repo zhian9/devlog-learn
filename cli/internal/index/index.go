@@ -137,7 +137,8 @@ func WriteWithOptions(outDir string, infos []cache.DocInfo, now time.Time, opts 
 	report.GlobalJSON = globalJSON
 
 	globalReadme := filepath.Join(outDir, "README.md")
-	if err := writeFile(globalReadme, []byte(globalReadmeMarkdown(global))); err != nil {
+	globalExperience := fileExists(filepath.Join(outDir, "EXPERIENCE.md"))
+	if err := writeFile(globalReadme, []byte(globalReadmeMarkdown(global, globalExperience))); err != nil {
 		errs = append(errs, err)
 	} else {
 		generated = append(generated, manifest.GeneratedFile{Path: "README.md"})
@@ -169,7 +170,8 @@ func WriteWithOptions(outDir string, infos []cache.DocInfo, now time.Time, opts 
 		})
 
 		readmePath := filepath.Join(outDir, filepath.FromSlash(group.dir), "README.md")
-		if err := writeFile(readmePath, []byte(projectReadmeMarkdown(projectDoc))); err != nil {
+		projectExperience := fileExists(filepath.Join(outDir, filepath.FromSlash(group.dir), "EXPERIENCE.md"))
+		if err := writeFile(readmePath, []byte(projectReadmeMarkdown(projectDoc, projectExperience))); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -356,13 +358,18 @@ func sortedShared(a, b map[string]bool) []string {
 	return out
 }
 
-func globalReadmeMarkdown(doc Document) string {
+func globalReadmeMarkdown(doc Document, experienceExists bool) string {
 	var b strings.Builder
 	b.WriteString("# devlog-learn knowledge index\n\n")
 	fmt.Fprintf(&b, "Generated: %s\n\n", doc.GeneratedAt.UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "Active documents: %d\n\n", doc.Total)
 	fmt.Fprintf(&b, "Projects: %d\n\n", len(doc.Projects))
 	b.WriteString("Stale documents are excluded from this index but remain in the cache.\n\n")
+
+	if experienceExists {
+		b.WriteString("## Experience\n\n")
+		b.WriteString("- [EXPERIENCE.md](EXPERIENCE.md) — 项目经历 / 实习经验与静态复习清单\n\n")
+	}
 
 	b.WriteString("## Projects\n\n")
 	if len(doc.Projects) == 0 {
@@ -381,14 +388,23 @@ func globalReadmeMarkdown(doc Document) string {
 	return b.String()
 }
 
-func projectReadmeMarkdown(doc Document) string {
+func projectReadmeMarkdown(doc Document, experienceExists bool) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", cell(doc.Project))
 	fmt.Fprintf(&b, "Generated: %s\n\n", doc.GeneratedAt.UTC().Format(time.RFC3339))
 	fmt.Fprintf(&b, "Active documents: %d\n\n", doc.Total)
+	if experienceExists {
+		b.WriteString("## Experience\n\n")
+		b.WriteString("- [EXPERIENCE.md](EXPERIENCE.md) — 项目经历 / 实习经验与静态复习清单\n\n")
+	}
 	b.WriteString("## Documents\n\n")
 	writeReadmeDocTable(&b, doc.Docs, false)
 	return b.String()
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func writeReadmeDocTable(b *strings.Builder, entries []DocEntry, includeProject bool) {

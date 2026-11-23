@@ -16,6 +16,7 @@ import { api, formatDate, jobEventsUrl } from '../api'
 import {
   Badge,
   Banner,
+  CopyButton,
   EmptyState,
   ErrorBox,
   Loading,
@@ -54,8 +55,9 @@ function statusTone(status: string): 'green' | 'amber' | 'red' | 'neutral' | 'bl
 }
 
 type PendingStart =
-  | { kind: 'sessions'; sessions: string[] }
-  | { kind: 'segments'; segments: string[] }
+  // selection carries whole sessions plus individually picked segments.
+  | { kind: 'selection'; sessions: string[]; segments: string[] }
+  | { kind: 'retry'; segments: string[] }
 
 export function Extract() {
   const queryClient = useQueryClient()
@@ -145,7 +147,7 @@ export function Extract() {
   const start = useMutation({
     mutationFn: (request: PendingStart) =>
       api.startExtract(
-        request.kind === 'segments'
+        request.kind === 'retry'
           ? {
               // Retries must be able to find the original segment regardless
               // of the current time/provider filters.
@@ -160,6 +162,7 @@ export function Extract() {
               provider,
               since,
               sessions: request.sessions,
+              segments: request.segments,
               concurrency: 2,
               timeout_seconds: 180,
             },
@@ -216,34 +219,91 @@ export function Extract() {
   }, [allSessions, onlyPending, search])
 
   const selectedSessions = useMemo(
-    () => allSessions.filter((session) => selected.has(session.selector)),
+    () =>
+      allSessions.filter((session) =>
+        session.segments.some((segment) => selected.has(segment.id)),
+      ),
     [allSessions, selected],
   )
-  const selectedSegments = selectedSessions.reduce((sum, session) => sum + session.segment_count, 0)
-  const selectedExtracted = selectedSessions.reduce((sum, session) => sum + session.extracted, 0)
-  const selectedEvents = selectedSessions.reduce((sum, session) => sum + session.event_count, 0)
+  const selectedCount = selected.size
+  const selectedExtracted = useMemo(
+    () =>
+      allSessions.reduce(
+        (sum, session) =>
+          sum +
+          session.segments.filter((segment) => selected.has(segment.id) && segment.extracted).length,
+        0,
+      ),
+    [allSessions, selected],
+  )
+  const selectedEvents = useMemo(
+    () =>
+      allSessions.reduce(
+        (sum, session) =>
+          sum +
+          session.segments
+            .filter((segment) => selected.has(segment.id))
+            .reduce((events, segment) => events + segment.event_count, 0),
+        0,
+      ),
+    [allSessions, selected],
+  )
 
-  const toggle = (selector: string) => {
+  const visibleSegmentIds = useMemo(
+    () => filtered.flatMap((session) => session.segments.map((segment) => segment.id)),
+    [filtered],
+  )
+
+  const toggleSegment = (id: string) => {
     setSelected((previous) => {
       const next = new Set(previous)
-      if (next.has(selector)) next.delete(selector)
-      else next.add(selector)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSession = (session: SelectableSession) => {
+    setSelected((previous) => {
+      const next = new Set(previous)
+      const allSelected =
+        session.segments.length > 0 &&
+        session.segments.every((segment) => next.has(segment.id))
+      for (const segment of session.segments) {
+        if (allSelected) next.delete(segment.id)
+        else next.add(segment.id)
+      }
       return next
     })
   }
 
   const toggleAll = () => {
-    const visible = filtered.map((session) => session.selector)
-    const allSelected = visible.length > 0 && visible.every((selector) => selected.has(selector))
+    const allSelected =
+      visibleSegmentIds.length > 0 && visibleSegmentIds.every((id) => selected.has(id))
     setSelected((previous) => {
       const next = new Set(previous)
-      if (allSelected) {
-        for (const selector of visible) next.delete(selector)
-      } else {
-        for (const selector of visible) next.add(selector)
+      for (const id of visibleSegmentIds) {
+        if (allSelected) next.delete(id)
+        else next.add(id)
       }
       return next
     })
+  }
+
+  // Whole sessions go as session selectors; partial picks go as exact segment
+  // IDs. The server treats both as a union.
+  const selectionPayload = () => {
+    const sessionsToRun: string[] = []
+    const segmentsToRun: string[] = []
+    for (const session of selectedSessions) {
+      const picked = session.segments.filter((segment) => selected.has(segment.id))
+      if (picked.length === session.segments.length && session.segments.length > 0) {
+        sessionsToRun.push(session.selector)
+      } else {
+        segmentsToRun.push(...picked.map((segment) => segment.id))
+      }
+    }
+    return { sessions: sessionsToRun, segments: segmentsToRun }
   }
 
   const progress = job && job.total > 0 ? Math.min(100, Math.round((job.done / job.total) * 100)) : 0
@@ -304,7 +364,7 @@ export function Extract() {
               {!running && failedSegments.length > 0 && (
                 <button
                   className="button ghost small"
-                  onClick={() => setPending({ kind: 'segments', segments: failedSegments })}
+                  onClick={() => setPending({ kind: 'retry', segments: failedSegments })}
                 >
                   <RefreshCw size={13} /> 重试失败片段（{failedSegments.length}）
                 </button>
@@ -458,9 +518,10 @@ export function Extract() {
               <SessionRow
                 key={session.selector}
                 session={session}
-                checked={selected.has(session.selector)}
+                selected={selected}
                 disabled={running}
-                onToggle={() => toggle(session.selector)}
+                onToggleSession={() => toggleSession(session)}
+                onToggleSegment={toggleSegment}
               />
             ))}
           </div>
@@ -471,7 +532,7 @@ export function Extract() {
         <div className="action-summary">
           <span>
             已选 <strong>{selectedSessions.length}</strong> 个会话 ·{' '}
-            <strong>{selectedSegments}</strong> 个 Segment
+            <strong>{selectedCount}</strong> 个 Segment
           </span>
           <span className="muted">
             {selectedExtracted > 0
@@ -481,8 +542,8 @@ export function Extract() {
         </div>
         <button
           className="button primary"
-          disabled={selectedSegments === 0 || running}
-          onClick={() => setPending({ kind: 'sessions', sessions: [...selected] })}
+          disabled={selectedCount === 0 || running}
+          onClick={() => setPending({ kind: 'selection', ...selectionPayload() })}
         >
           <Zap size={15} /> 开始提炼
         </button>
@@ -495,7 +556,7 @@ export function Extract() {
             <div className="modal-head">
               <div>
                 <div className="eyebrow">CONFIRM</div>
-                <h2>{pending.kind === 'segments' ? '重试失败片段' : '确认开始提炼'}</h2>
+                <h2>{pending.kind === 'retry' ? '重试失败片段' : '确认开始提炼'}</h2>
               </div>
               <button className="icon-button" onClick={() => setPending(null)} aria-label="关闭">
                 ×
@@ -506,21 +567,21 @@ export function Extract() {
                 <div>
                   <dt>来源</dt>
                   <dd>
-                    {pending.kind === 'segments' ? '全部来源（重试）' : providerLabel(provider)}
+                    {pending.kind === 'retry' ? '全部来源（重试）' : providerLabel(provider)}
                   </dd>
                 </div>
                 <div>
                   <dt>时间范围</dt>
                   <dd>
-                    {pending.kind === 'segments' ? '全部历史（定位原 Segment）' : sinceLabel(since)}
+                    {pending.kind === 'retry' ? '全部历史（定位原 Segment）' : sinceLabel(since)}
                   </dd>
                 </div>
                 <div>
                   <dt>会话 / Segment</dt>
                   <dd>
-                    {pending.kind === 'segments'
+                    {pending.kind === 'retry'
                       ? `— / ${pending.segments.length}`
-                      : `${selectedSessions.length} / ${selectedSegments}`}
+                      : `${selectedSessions.length} 个会话 / ${selectedCount} 个 Segment`}
                   </dd>
                 </div>
                 <div>
@@ -552,7 +613,7 @@ export function Extract() {
                 )}
                 {start.isPending
                   ? '正在启动…'
-                  : pending.kind === 'segments'
+                  : pending.kind === 'retry'
                     ? '确认重试'
                     : '确认开始'}
               </button>
@@ -566,29 +627,48 @@ export function Extract() {
 
 function SessionRow({
   session,
-  checked,
+  selected,
   disabled,
-  onToggle,
+  onToggleSession,
+  onToggleSegment,
 }: {
   session: SelectableSession
-  checked: boolean
+  selected: Set<string>
   disabled: boolean
-  onToggle: () => void
+  onToggleSession: () => void
+  onToggleSegment: (id: string) => void
 }) {
   const complete = session.extracted >= session.segment_count
+  const picked = session.segments.filter((segment) => selected.has(segment.id)).length
+  const allSelected = session.segments.length > 0 && picked === session.segments.length
+  const someSelected = picked > 0 && !allSelected
   return (
-    <div className={`session-row${checked ? ' selected' : ''}${complete ? ' complete' : ''}`}>
+    <div
+      className={`session-row${picked > 0 ? ' selected' : ''}${complete ? ' complete' : ''}`}
+      onClick={(event) => {
+        if (disabled) return
+        const target = event.target as HTMLElement
+        // The checkbox, copy button, and the segment <details> handle their own
+        // clicks; anywhere else on the row toggles the whole session.
+        if (target.closest('input, button, a, summary, details, label')) return
+        onToggleSession()
+      }}
+    >
       <input
         type="checkbox"
-        checked={checked}
+        ref={(element) => {
+          if (element) element.indeterminate = someSelected
+        }}
+        checked={allSelected}
         disabled={disabled}
-        onChange={onToggle}
+        onChange={onToggleSession}
         aria-label={`选择会话 ${session.title}`}
       />
       <div className="session-main">
         <div className="session-title">
           {session.title || '（无会话标题）'}
           {complete && <Badge tone="outline">已全部提炼</Badge>}
+          {picked > 0 && !complete && <Badge tone="blue">已选 {picked} 段</Badge>}
         </div>
         <div className="session-meta">
           <span>{session.source}</span>
@@ -603,21 +683,36 @@ function SessionRow({
           <span>·</span>
           <span>{session.event_count} 个事件</span>
         </div>
-        <div className="session-selector">{session.selector}</div>
+        <div className="session-selector with-copy">
+          <span>{session.selector}</span>
+          <CopyButton text={session.selector} />
+        </div>
       </div>
       <details className="session-details">
-        <summary>片段</summary>
+        <summary>
+          片段（{picked}/{session.segments.length}）
+        </summary>
         <div className="session-segments">
-          {session.segments.map((segment) => (
-            <div key={segment.id}>
-              <span className={`dot ${segment.extracted ? 'ok' : 'warn'}`} />
-              <span className="segment-title">{segment.title || segment.id}</span>
-              <span className="muted">
-                {formatDate(segment.start)} · {segment.event_count} 事件
-              </span>
-              {segment.extracted && <Badge tone="green">已提炼</Badge>}
-            </div>
-          ))}
+          {session.segments.map((segment) => {
+            const checked = selected.has(segment.id)
+            return (
+              <label className={`segment-row${checked ? ' selected' : ''}`} key={segment.id}>
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={disabled}
+                  onChange={() => onToggleSegment(segment.id)}
+                  aria-label={`选择片段 ${segment.title || segment.id}`}
+                />
+                <span className={`dot ${segment.extracted ? 'ok' : 'warn'}`} />
+                <span className="segment-title">{segment.title || segment.id}</span>
+                <span className="muted">
+                  {formatDate(segment.start)} · {segment.event_count} 事件
+                </span>
+                {segment.extracted && <Badge tone="green">已提炼</Badge>}
+              </label>
+            )
+          })}
         </div>
       </details>
     </div>

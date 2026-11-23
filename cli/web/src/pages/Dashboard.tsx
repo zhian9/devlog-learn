@@ -116,6 +116,7 @@ export function Dashboard() {
           detail={`${cache.stale_docs} 篇已过期，不进入索引`}
           icon={<FileText size={18} />}
           tone="blue"
+          to="/library"
         />
         <StatCard
           label="待审核"
@@ -123,6 +124,7 @@ export function Dashboard() {
           detail={`已通过 ${cache.approved} · 已驳回 ${cache.rejected}`}
           icon={<ShieldCheck size={18} />}
           tone={cache.pending > 0 ? 'amber' : 'green'}
+          to="/library?review=pending"
         />
         <StatCard
           label="未解决问题"
@@ -130,12 +132,14 @@ export function Dashboard() {
           detail={`已解决 ${data.questions.resolved}`}
           icon={<CircleHelp size={18} />}
           tone={data.questions.open > 0 ? 'violet' : 'green'}
+          to="/questions"
         />
         <StatCard
           label="本地缓存"
           value={formatBytes(cache.size_bytes)}
           detail={cache.dir}
           icon={<Database size={18} />}
+          to="/settings"
         />
       </section>
 
@@ -154,7 +158,12 @@ export function Dashboard() {
             <EmptyState
               icon={<BookOpen size={26} />}
               title="还没有文档"
-              description="先运行 devlog-learn run 或 extract，再回到这里查看。"
+              description="先从本地 Claude Code / Codex 会话里提炼第一份学习案例。"
+              action={
+                <Link className="button primary" to="/extract">
+                  去提炼
+                </Link>
+              }
             />
           ) : (
             <div className="recent-list">
@@ -191,8 +200,8 @@ export function Dashboard() {
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h2>项目分布</h2>
-              <p>{data.projects.length} 个项目有有效文档。</p>
+              <h2>项目经历</h2>
+              <p>{data.projects.length} 个项目有有效文档；点击查看经历与复习清单。</p>
             </div>
           </div>
           {data.projects.length === 0 ? (
@@ -202,7 +211,7 @@ export function Dashboard() {
               {data.projects.map((project) => (
                 <Link
                   className="project-item"
-                  to={`/library?project=${encodeURIComponent(project.name)}`}
+                  to={`/experiences?project=${encodeURIComponent(project.name)}`}
                   key={project.name}
                 >
                   <div className="project-avatar">{project.name.slice(0, 1).toUpperCase()}</div>
@@ -275,9 +284,13 @@ export function Dashboard() {
         {data.knowledge_types && Object.keys(data.knowledge_types).length > 0 && (
           <div className="knowledge-strip">
             {Object.entries(data.knowledge_types).map(([kind, count]) => (
-              <span key={kind} className="knowledge-pill">
+              <Link
+                key={kind}
+                className="knowledge-pill"
+                to={`/library?kind=${encodeURIComponent(kind)}`}
+              >
                 {kindLabel(kind)} <strong>{count}</strong>
-              </span>
+              </Link>
             ))}
           </div>
         )}

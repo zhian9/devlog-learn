@@ -240,6 +240,9 @@ export interface StatusOutputs {
   digest_exists: boolean
   digest_modified_at?: string
   digest_stale: boolean
+  experience_exists: boolean
+  experience_modified_at?: string
+  experience_stale: boolean
 }
 
 export interface StatusProvider {
@@ -353,6 +356,7 @@ export interface ExportResponse {
   index_projects: number
   digest_path?: string
   digest_docs: number
+  experience_written: number
   paths?: string[]
   warnings?: string[]
   out_dir: string
@@ -477,4 +481,115 @@ export interface JobSnapshot {
   error?: string
   result?: JobResult
   events?: JobEvent[]
+}
+
+export interface ExperienceSummary {
+  project: string
+  kind: string
+  kind_label: string
+  kind_source: string
+  suggested_kind?: string
+  organization?: string
+  role?: string
+  period?: string
+  start?: string
+  end?: string
+  docs: number
+  sessions: number
+  sources: string[]
+  stack: string[]
+  has_synthesis: boolean
+  markdown_path: string
+}
+
+export interface ExperiencesResponse {
+  count: number
+  experiences: ExperienceSummary[]
+  warnings?: string[]
+}
+
+export interface ExperienceHighlight {
+  text: string
+  doc_ids: string[]
+  evidence_verified?: number
+}
+
+export interface ExperienceTimelineItem {
+  date?: string
+  title: string
+  doc_id: string
+  kind?: string
+  status?: string
+}
+
+export interface ExperienceReviewItem {
+  id: string
+  text: string
+  doc_id?: string
+  doc_title?: string
+  kind: string
+}
+
+export interface ExperienceDocRef {
+  id: string
+  title: string
+  summary?: string
+  knowledge_type: string
+  status: string
+  learning_value?: string
+  review_status: string
+  occurred_at?: string
+  confidence: number
+  session_id?: string
+  segment_id?: string
+  evidence_verified?: number
+  evidence_checked?: number
+}
+
+export interface ExperienceSynthesis {
+  version: number
+  project: string
+  provider: string
+  model: string
+  generated_at: string
+  prompt_hash: string
+  input_hash: string
+  summary?: string
+  background?: string
+  contributions: ExperienceHighlight[]
+  challenges: ExperienceHighlight[]
+  outcomes: ExperienceHighlight[]
+  stories: ExperienceHighlight[]
+  doc_ids: string[]
+  unverified: boolean
+}
+
+export interface Experience {
+  project: string
+  project_path?: string
+  paths: string[]
+  kind: string
+  kind_label: string
+  kind_source: string
+  organization?: string
+  role?: string
+  headline?: string
+  start?: string
+  end?: string
+  period?: string
+  docs: number
+  sessions: number
+  sources: string[]
+  stack: string[]
+  timeline: ExperienceTimelineItem[]
+  highlights: ExperienceHighlight[]
+  challenges: ExperienceHighlight[]
+  outcomes: string[]
+  lessons: string[]
+  blind_spots: ExperienceReviewItem[]
+  stories: ExperienceHighlight[]
+  review_checklist: ExperienceReviewItem[]
+  doc_refs: ExperienceDocRef[]
+  warnings?: string[]
+  synthesized?: ExperienceSynthesis
 }

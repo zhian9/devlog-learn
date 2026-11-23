@@ -180,6 +180,46 @@ func TestSearchFiltersProjectTagsReviewAndStale(t *testing.T) {
 	}
 }
 
+func TestSearchFiltersKindStatusAndLearningValue(t *testing.T) {
+	bugFix := searchDoc("bug", "demo", "Fix cache", "cache bug", nil, searchTime)
+	bugFix.KnowledgeType = "bug_fix"
+	bugFix.Status = "resolved"
+	bugFix.LearningValue = "high"
+
+	architecture := searchDoc("arch", "demo", "Cache design", "cache design", nil, searchTime)
+	architecture.KnowledgeType = "architecture"
+	architecture.Status = "workaround"
+	architecture.LearningValue = "low"
+	docs := searchInfos(bugFix, architecture)
+
+	cases := []struct {
+		name string
+		opts Options
+		want string
+	}{
+		{name: "kind", opts: Options{Kind: "architecture"}, want: "arch"},
+		{name: "status", opts: Options{Status: "resolved"}, want: "bug"},
+		{name: "learning", opts: Options{LearningValue: "high"}, want: "bug"},
+		{name: "combined", opts: Options{Kind: "bug_fix", Status: "resolved", LearningValue: "high"}, want: "bug"},
+	}
+	for _, tc := range cases {
+		tc.opts.Query = "cache"
+		results := Search(docs, tc.opts)
+		if len(results) != 1 || results[0].ID != tc.want {
+			t.Fatalf("%s filter = %+v, want only id %q", tc.name, results, tc.want)
+		}
+	}
+
+	// "any"/"all"/"*" disable the facet and keep both documents.
+	if results := Search(docs, Options{Query: "cache", Kind: "any", Status: "all", LearningValue: "*"}); len(results) != 2 {
+		t.Fatalf("any/all facets = %+v, want both documents", results)
+	}
+
+	if results := Search(docs, Options{Query: "cache", Kind: "missing"}); len(results) != 0 {
+		t.Fatalf("missing kind should return nothing, got %+v", results)
+	}
+}
+
 func TestSearchEmptyQueryReturnsRecentFirst(t *testing.T) {
 	oldDoc := searchDoc("old", "demo", "Old", "old", nil, searchTime.Add(-2*time.Hour))
 	newDoc := searchDoc("new", "demo", "New", "new", nil, searchTime)

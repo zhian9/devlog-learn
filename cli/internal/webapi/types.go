@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"devlog-learn/internal/experience"
 	"devlog-learn/internal/extract"
 	"devlog-learn/internal/index"
 	"devlog-learn/internal/ingest"
@@ -11,6 +12,19 @@ import (
 	"devlog-learn/internal/questions"
 	"devlog-learn/internal/search"
 )
+
+// ExperienceListItem is one row in the read-only experience list.
+type ExperienceListItem struct {
+	experience.Summary
+	MarkdownPath string `json:"markdown_path"`
+}
+
+// ExperiencesResponse is the experience list payload.
+type ExperiencesResponse struct {
+	Count       int                  `json:"count"`
+	Experiences []ExperienceListItem `json:"experiences"`
+	Warnings    []string             `json:"warnings,omitempty"`
+}
 
 // StatusResponse is the dashboard payload. It intentionally mirrors the CLI
 // "status" report but stays a web-specific shape so the CLI text output can
@@ -63,6 +77,10 @@ type StatusOutputs struct {
 	DigestExists     bool       `json:"digest_exists"`
 	DigestModifiedAt *time.Time `json:"digest_modified_at,omitempty"`
 	DigestStale      bool       `json:"digest_stale"`
+
+	ExperienceExists     bool       `json:"experience_exists"`
+	ExperienceModifiedAt *time.Time `json:"experience_modified_at,omitempty"`
+	ExperienceStale      bool       `json:"experience_stale"`
 }
 
 type StatusProvider struct {
@@ -146,21 +164,23 @@ type ExportRequest struct {
 	DigestProject string `json:"digest_project"`
 	DigestLimit   int    `json:"digest_limit"`
 	ForceDigest   bool   `json:"force_digest"`
+	Experience    bool   `json:"experience"`
 }
 
 type ExportResponse struct {
-	Profile       string   `json:"profile"`
-	Rendered      int      `json:"rendered"`
-	StaleSkipped  int      `json:"stale_skipped"`
-	Pruned        int      `json:"pruned"`
-	PruneSkipped  int      `json:"prune_skipped"`
-	IndexDocs     int      `json:"index_docs"`
-	IndexProjects int      `json:"index_projects"`
-	DigestPath    string   `json:"digest_path,omitempty"`
-	DigestDocs    int      `json:"digest_docs"`
-	Paths         []string `json:"paths,omitempty"`
-	Warnings      []string `json:"warnings,omitempty"`
-	OutDir        string   `json:"out_dir"`
+	Profile           string   `json:"profile"`
+	Rendered          int      `json:"rendered"`
+	StaleSkipped      int      `json:"stale_skipped"`
+	Pruned            int      `json:"pruned"`
+	PruneSkipped      int      `json:"prune_skipped"`
+	IndexDocs         int      `json:"index_docs"`
+	IndexProjects     int      `json:"index_projects"`
+	DigestPath        string   `json:"digest_path,omitempty"`
+	DigestDocs        int      `json:"digest_docs"`
+	ExperienceWritten int      `json:"experience_written"`
+	Paths             []string `json:"paths,omitempty"`
+	Warnings          []string `json:"warnings,omitempty"`
+	OutDir            string   `json:"out_dir"`
 }
 
 // ExtractJobRequest starts one extraction job. Sessions and segments use the

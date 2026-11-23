@@ -35,8 +35,15 @@ type Options struct {
 	Project string
 	Tags    []string
 	Review  string
-	Limit   int
-	OutDir  string
+
+	// Kind, Status, and LearningValue are exact-match facets used by the local
+	// document library. Empty, "any", "*", and "all" disable the facet.
+	Kind          string
+	Status        string
+	LearningValue string
+
+	Limit  int
+	OutDir string
 
 	// IncludeStale opts into stale documents. It defaults to false so every
 	// existing CLI/MCP caller keeps the active-only contract.
@@ -107,7 +114,10 @@ func Search(infos []cache.DocInfo, opts Options) []Result {
 
 	results := make([]Result, 0, len(docs))
 	for _, doc := range docs {
-		if !matchesProject(opts.Project, doc) || !matchesTags(opts.Tags, doc) || !matchesReview(opts.Review, doc) {
+		if !matchesProject(opts.Project, doc) || !matchesTags(opts.Tags, doc) || !matchesReview(opts.Review, doc) ||
+			!matchesFacet(opts.Kind, doc.KnowledgeType) ||
+			!matchesFacet(opts.Status, doc.Status) ||
+			!matchesFacet(opts.LearningValue, doc.LearningValue) {
 			continue
 		}
 		score, matched := scoreDoc(opts.Query, doc)
@@ -242,6 +252,16 @@ func matchesReview(review string, doc *extract.Doc) bool {
 		return true
 	}
 	return strings.EqualFold(review, strings.TrimSpace(doc.ReviewStatus))
+}
+
+// matchesFacet applies one exact-match library filter. "all"/"any" are treated
+// as "no filter" so the UI can round-trip its default state through the URL.
+func matchesFacet(filter, value string) bool {
+	filter = strings.ToLower(strings.TrimSpace(filter))
+	if filter == "" || filter == "*" || filter == "any" || filter == "all" {
+		return true
+	}
+	return strings.EqualFold(filter, strings.TrimSpace(value))
 }
 
 // scoreDoc uses the same ASCII-word/CJK-bigram similarity as segmentation, so

@@ -7,6 +7,7 @@
 - **本地 Web UI**：阅读、搜索、证据回看、人工审核、问题闭环、选择会话提炼。
 - **Agent 记忆**：稳定的 Markdown、全局/项目索引、`AGENTS.md`、只读 MCP Server。
 - **中文学习案例**：定位路径、被排除的假设、有效命令、知识卡、盲区、自测题。
+- **项目经历 / 实习经验**：按项目目录聚合多次会话，附关键工作、难点、结果和静态复习清单。
 - **可追溯证据**：每条结论引用原始事件 seq，可回看当时的命令、输出和退出码。
 
 当前版本：`0.13.0`。支持 `claude-code` 与 `codex`，**不支持 Cursor IDE**。
@@ -34,6 +35,23 @@ Windows 下也可以直接双击 [`cli/start-webui.cmd`](cli/start-webui.cmd)：
 3. 阅读后做审核、关闭待办问题。
 4. 在“提炼”里选择会话，确认后提炼。
 5. 在“设置与导出”里生成 Markdown、索引和 `AGENTS.md`。
+
+## 常见用法
+
+| 你想做什么 | 入口 |
+|---|---|
+| 阅读、搜索、审核、关闭待办问题 | Web UI：`devlog-learn serve` |
+| 从会话里挑内容提炼（可按会话或单个 Segment） | Web UI 的“提炼”页 |
+| 第一次用，先看再提炼（不调用模型） | `dry-run` → `sessions` → `wizard` |
+| 一条命令提炼 + 渲染 + 建索引 | `devlog-learn run --provider all --since 7d --segments 1` |
+| 定时增量更新 | `run --since 1d` + Windows 计划任务 / cron |
+| 给 Claude Code / Codex 按需检索 | MCP：`devlog-learn mcp` |
+| 给任意 Agent 一份记忆文件 | `devlog-learn digest` → `.devlog-docs/AGENTS.md` |
+| 生成学习版 Markdown | `devlog-learn render --profile learning` |
+| 把同一目录的会话整理成项目经历 / 实习经验 | Web UI 的“项目经历”页，或 `devlog-learn experience render` |
+| 生成项目复习清单 | `devlog-learn experience checklist --project <项目>` |
+
+完整的场景、参数和示例见 [`cli/README.md` 的“各种用法（按场景）”](cli/README.md#各种用法按场景)。
 
 ## 文档
 

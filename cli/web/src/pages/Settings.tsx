@@ -13,6 +13,7 @@ import { api, formatBytes, formatDateTime } from '../api'
 import {
   Badge,
   Banner,
+  CopyButton,
   ErrorBox,
   Loading,
   PageHeader,
@@ -25,6 +26,7 @@ export function Settings() {
   const [prune, setPrune] = useState(false)
   const [digest, setDigest] = useState(true)
   const [digestReview, setDigestReview] = useState('any')
+  const [experience, setExperience] = useState(true)
   const [notice, setNotice] = useState('')
   const [warnings, setWarnings] = useState<string[]>([])
 
@@ -38,14 +40,18 @@ export function Settings() {
         prune,
         digest,
         digest_review: digestReview,
+        experience,
       }),
     onSuccess: (result) => {
       setWarnings(result.warnings ?? [])
       const digestNote = result.digest_path
         ? `；AGENTS.md 已更新（${result.digest_docs} 篇文档）`
         : ''
+      const experienceNote = result.experience_written
+        ? `；经历输出 ${result.experience_written} 个文件`
+        : ''
       setNotice(
-        `已生成 ${result.rendered} 个 Markdown，清理 ${result.pruned} 个过期文件；索引包含 ${result.index_docs} 篇文档、${result.index_projects} 个项目${digestNote}。输出目录：${result.out_dir}`,
+        `已生成 ${result.rendered} 个 Markdown，清理 ${result.pruned} 个过期文件；索引包含 ${result.index_docs} 篇文档、${result.index_projects} 个项目${digestNote}${experienceNote}。输出目录：${result.out_dir}`,
       )
       queryClient.invalidateQueries({ queryKey: ['status'] })
     },
@@ -133,6 +139,14 @@ export function Settings() {
                 </select>
               </label>
             )}
+            <label className="check-row">
+              <input
+                type="checkbox"
+                checked={experience}
+                onChange={(event) => setExperience(event.target.checked)}
+              />
+              同时生成项目经历 EXPERIENCE.md
+            </label>
           </div>
           <button
             className="button primary"
@@ -164,19 +178,31 @@ export function Settings() {
           <div className="path-list">
             <div>
               <span>缓存目录</span>
-              <code>{config.data?.cache_dir}</code>
+              <span className="path-value">
+                <code>{config.data?.cache_dir}</code>
+                {config.data?.cache_dir && <CopyButton text={config.data.cache_dir} />}
+              </span>
             </div>
             <div>
               <span>游标文件</span>
-              <code>{config.data?.cursor_path}</code>
+              <span className="path-value">
+                <code>{config.data?.cursor_path}</code>
+                {config.data?.cursor_path && <CopyButton text={config.data.cursor_path} />}
+              </span>
             </div>
             <div>
               <span>输出目录</span>
-              <code>{config.data?.out_dir}</code>
+              <span className="path-value">
+                <code>{config.data?.out_dir}</code>
+                {config.data?.out_dir && <CopyButton text={config.data.out_dir} />}
+              </span>
             </div>
             <div>
               <span>监听地址</span>
-              <code>{config.data?.addr}</code>
+              <span className="path-value">
+                <code>{config.data?.addr}</code>
+                {config.data?.addr && <CopyButton text={config.data.addr} />}
+              </span>
             </div>
           </div>
           <div className="local-note">
@@ -239,6 +265,10 @@ export function Settings() {
                 AGENTS.md {status.data.outputs.digest_exists ? '已生成' : '未生成'}
                 {status.data.outputs.digest_stale && '（已过期）'}
               </p>
+              <p>
+                EXPERIENCE.md {status.data.outputs.experience_exists ? '已生成' : '未生成'}
+                {status.data.outputs.experience_stale && '（已过期）'}
+              </p>
             </div>
           </div>
         )}
@@ -273,7 +303,12 @@ export function Settings() {
                     {provider.dir_exists ? `${provider.session_files} 个文件` : '不存在'}
                   </Badge>
                 </div>
-                <div className="health-line path">{provider.dir}</div>
+                <div className="health-line path">
+                  <span className="path-value">
+                    <code>{provider.dir}</code>
+                    <CopyButton text={provider.dir} />
+                  </span>
+                </div>
               </div>
             ))}
           </div>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  BriefcaseBusiness,
   CircleHelp,
   LayoutDashboard,
   Library,
@@ -8,12 +9,14 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { api } from '../api'
+import { ErrorBoundary } from './ErrorBoundary'
 
 const nav = [
   { to: '/', label: '概览', icon: LayoutDashboard, end: true },
   { to: '/library', label: '文档库', icon: Library },
+  { to: '/experiences', label: '项目经历', icon: BriefcaseBusiness },
   { to: '/extract', label: '提炼', icon: Zap },
   { to: '/questions', label: '待办问题', icon: CircleHelp },
   { to: '/settings', label: '设置与导出', icon: Settings },
@@ -21,12 +24,13 @@ const nav = [
 
 export function Layout() {
   const status = useQuery({ queryKey: ['status'], queryFn: api.status })
+  const location = useLocation()
   const openQuestions = status.data?.questions.open ?? 0
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand">
+        <Link className="brand" to="/">
           <div className="brand-mark">
             <Sparkles size={19} />
           </div>
@@ -34,7 +38,7 @@ export function Layout() {
             <div className="brand-name">devlog-learn</div>
             <div className="brand-sub">项目记忆与学习案例</div>
           </div>
-        </div>
+        </Link>
 
         <nav className="nav">
           {nav.map((item) => {
@@ -68,7 +72,9 @@ export function Layout() {
       </aside>
 
       <main className="main">
-        <Outlet />
+        <ErrorBoundary key={location.pathname + location.search} compact>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   )

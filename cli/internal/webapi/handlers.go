@@ -12,10 +12,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"devlog-learn/internal/cache"
 	"devlog-learn/internal/cursor"
 	"devlog-learn/internal/digest"
+	"devlog-learn/internal/experience"
 	"devlog-learn/internal/export"
 	"devlog-learn/internal/extract"
 	"devlog-learn/internal/index"
@@ -132,6 +134,74 @@ func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func (s *Server) handleExperiences(w http.ResponseWriter, _ *http.Request) {
+	infos, state, warnings := s.experienceContext()
+	exps := experience.Build(infos, s.store, state, time.Now())
+	paths := render.ExperiencePaths(exps)
+	items := make([]ExperienceListItem, 0, len(exps))
+	for _, exp := range exps {
+		items = append(items, ExperienceListItem{
+			Summary:      experience.Summarize(exp),
+			MarkdownPath: paths[exp.Project],
+		})
+	}
+	writeJSON(w, http.StatusOK, ExperiencesResponse{
+		Count:       len(items),
+		Experiences: items,
+		Warnings:    warnings,
+	})
+}
+
+func (s *Server) handleExperience(w http.ResponseWriter, r *http.Request) {
+	project := strings.TrimSpace(r.PathValue("project"))
+	if !validExperienceProject(project) {
+		writeError(w, http.StatusBadRequest, "invalid project name")
+		return
+	}
+	infos, state, warnings := s.experienceContext()
+	exp, err := experience.FindWith(experience.Build(infos, s.store, state, time.Now()), project, render.SafeProject)
+	if err != nil {
+		switch {
+		case errors.Is(err, experience.ErrNotFound):
+			writeError(w, http.StatusNotFound, err.Error())
+		case errors.Is(err, experience.ErrAmbiguous):
+			writeError(w, http.StatusConflict, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, err.Error())
+		}
+		return
+	}
+	if len(warnings) > 0 {
+		exp.Warnings = append(exp.Warnings, warnings...)
+	}
+	writeJSON(w, http.StatusOK, exp)
+}
+
+func (s *Server) experienceContext() ([]cache.DocInfo, *experience.State, []string) {
+	infos, warnings := s.store.ListActiveDocs()
+	state, err := experience.LoadState(experience.StatePath(s.opts.CacheDir))
+	if err != nil {
+		warnings = append(warnings, err.Error())
+		state = experience.NewState()
+	}
+	return infos, state, warnings
+}
+
+func validExperienceProject(value string) bool {
+	if value == "" || value == "." || value == ".." || len([]rune(value)) > 200 {
+		return false
+	}
+	if strings.ContainsAny(value, `/\`) {
+		return false
+	}
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
+}
+
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	infos, warnings := s.store.ListDocs()
@@ -141,13 +211,16 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	results := search.Search(infos, search.Options{
-		Query:        strings.TrimSpace(query.Get("q")),
-		Project:      strings.TrimSpace(query.Get("project")),
-		Tags:         query["tag"],
-		Review:       strings.TrimSpace(query.Get("review")),
-		IncludeStale: lifecycle == "all" || lifecycle == "stale",
-		All:          true,
-		OutDir:       s.opts.OutDir,
+		Query:         strings.TrimSpace(query.Get("q")),
+		Project:       strings.TrimSpace(query.Get("project")),
+		Tags:          query["tag"],
+		Review:        strings.TrimSpace(query.Get("review")),
+		Kind:          strings.TrimSpace(query.Get("kind")),
+		Status:        strings.TrimSpace(query.Get("status")),
+		LearningValue: strings.TrimSpace(firstNonEmpty(query.Get("learning"), query.Get("learning_value"))),
+		IncludeStale:  lifecycle == "all" || lifecycle == "stale",
+		All:           true,
+		OutDir:        s.opts.OutDir,
 	})
 
 	if lifecycle == "stale" {
@@ -508,6 +581,21 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if request.Experience {
+		state, stateErr := experience.LoadState(experience.StatePath(s.opts.CacheDir))
+		if stateErr != nil {
+			response.Warnings = append(response.Warnings, "EXPERIENCE.md: "+stateErr.Error())
+		} else if expReport, expErr := export.RenderExperiences(s.store, s.opts.OutDir, state, export.ExperienceRenderOptions{
+			Prune: request.Prune,
+		}); expErr != nil {
+			response.Warnings = append(response.Warnings, "EXPERIENCE.md: "+expErr.Error())
+		} else {
+			response.ExperienceWritten = expReport.Written
+			response.Paths = append(response.Paths, expReport.Paths...)
+			response.Warnings = append(response.Warnings, expReport.Warnings...)
+		}
+	}
+
 	indexReport, warnings, err := export.BuildIndexWithOptions(s.store, s.opts.OutDir, time.Now().UTC(), index.WriteOptions{
 		Prune: request.Prune,
 	})
@@ -609,6 +697,14 @@ func inspectOutputs(outDir string, newestDoc *time.Time) StatusOutputs {
 		out.DigestModifiedAt = &modified
 		out.DigestStale = newestDoc != nil && modified.Before(*newestDoc)
 	}
+
+	experiencePath := filepath.Join(outDir, "EXPERIENCE.md")
+	if stat, err := os.Stat(experiencePath); err == nil {
+		out.ExperienceExists = true
+		modified := stat.ModTime().UTC()
+		out.ExperienceModifiedAt = &modified
+		out.ExperienceStale = newestDoc != nil && modified.Before(*newestDoc)
+	}
 	return out
 }
 
@@ -706,6 +802,15 @@ func statusForLoad(err error) int {
 		return http.StatusNotFound
 	}
 	return http.StatusInternalServerError
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func positiveInt(value string, fallback int) int {

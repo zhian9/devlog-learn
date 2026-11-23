@@ -145,6 +145,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/status", s.handleStatus)
 	s.mux.HandleFunc("GET /api/config", s.handleConfig)
 	s.mux.HandleFunc("GET /api/projects", s.handleProjects)
+	s.mux.HandleFunc("GET /api/experiences", s.handleExperiences)
+	s.mux.HandleFunc("GET /api/experiences/{project}", s.handleExperience)
 	s.mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	s.mux.HandleFunc("GET /api/docs", s.handleDocs)
 	s.mux.HandleFunc("GET /api/docs/{id}", s.handleDoc)

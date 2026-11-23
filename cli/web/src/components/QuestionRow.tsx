@@ -66,7 +66,10 @@ export function QuestionRow({
           <input
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            placeholder="解决备注（可选）"
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !resolve.isPending) resolve.mutate()
+            }}
+            placeholder="解决备注（可选，按 Enter 提交）"
             aria-label="解决备注"
           />
           <button

@@ -20,6 +20,11 @@ network behavior, authentication, retention policy, or provider configuration.
 Depending on that CLI and its account settings, prompt content may be sent to a
 model provider.
 
+`experience synthesize` uses the same local CLI, but sends only compact,
+already-redacted Doc summaries (title, summary, root cause, lessons). It never
+sends raw session events or evidence quotes. Read-only experience commands and
+the Web UI never invoke a model.
+
 Before extracting private logs:
 
 1. Review the provider and account data policy.

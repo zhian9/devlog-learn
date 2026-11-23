@@ -18,12 +18,12 @@ ingest -> segment -> redact -> prompt -> local claude/codex CLI
                  +----------------------------+------------------+
                  |                            |                  |
                  v                            v                  v
-              cache/docs                 Web UI / MCP       render/index/digest
+              cache/docs                 Web UI / MCP    render/index/digest/experience
                  |                            |                  |
                  +----------------------------+------------------+
                                               |
                                               v
-                                  Markdown, indexes, AGENTS.md
+                         Markdown, indexes, AGENTS.md, EXPERIENCE.md
 ```
 
 The pipeline is incremental. File SHA-256 fingerprints decide whether parsing
@@ -42,6 +42,7 @@ cache entries are reusable.
 | `cli/internal/cache` | Versioned entries, canonical docs, segments, writer lock |
 | `cli/internal/cursor` | File fingerprints and incremental state |
 | `cli/internal/extract` | Doc schema, prompts, CLI adapters, evidence validation |
+| `cli/internal/experience` | Project-level experience aggregation, sidecar metadata, optional synthesis |
 | `cli/internal/render` | Stable Agent and learning Markdown profiles |
 | `cli/internal/index` | Global/project indexes and related-document scoring |
 | `cli/internal/manifest` | Output ownership records and safe pruning |
@@ -64,6 +65,12 @@ embedded into the Go binary.
 - Evidence must reference `event_seq` values present in the prompt input.
 - Strong claims without verified evidence are downgraded.
 
+### Web JSON arrays
+
+List fields in Web API responses are never `null`; empty results serialize as
+`[]`. The TypeScript client iterates them directly, so a nil Go slice must be
+normalized at the handler or model boundary.
+
 ### Review state
 
 Human review and resolved questions are stored separately where practical:
@@ -71,6 +78,23 @@ Human review and resolved questions are stored separately where practical:
 - Doc review fields live in `docs/<id>.json`.
 - Resolved question state lives in `questions.json`.
 - Re-extraction preserves review state only when `segment_hash` is unchanged.
+
+### Experience aggregation
+
+- Experience reads active Docs only and groups them by `doc.Project`, the same
+  key used by index, search, and the Web UI. Stale Docs are excluded.
+- Source directories are read opportunistically from cached Segments. Missing
+  Segments, missing `Cwd`, and redacted paths are non-fatal and only produce
+  display warnings.
+- `<cache-dir>/experiences.json` stores human-owned kind, organization, role,
+  period, and headline. Automatic kind suggestions never override manual data.
+- `EXPERIENCE.md` is written under a separate manifest profile (`experience`)
+  and never modifies Doc JSON, agent/learning Markdown, `index.json`, root
+  `README.md`, or `AGENTS.md`.
+- The review checklist is static. Synthesis is cached separately under
+  `<cache-dir>/experience-synthesis/`, is generated only by
+  `experience synthesize`, is labeled unverified, and never replaces the
+  deterministic baseline.
 
 ### Output ownership
 
@@ -93,6 +117,7 @@ The lock covers:
 - extraction and cursor updates;
 - whole `run` and `wizard` workflows;
 - review and question mutations;
+- experience metadata, synthesis caches, and experience rendering;
 - rendering, indexing, digest generation, and export.
 
 Cache files and the manifest are replaced through temporary files where

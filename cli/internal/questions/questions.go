@@ -191,7 +191,9 @@ func (s *State) ResolvedIDs() map[string]bool {
 func Collect(infos []cache.DocInfo, state *State, filter Filter) []Entry {
 	status := normalizeStatus(filter.Status)
 	seen := map[string]bool{}
-	var out []Entry
+	// Return an initialized slice so the JSON API serializes an empty result as
+	// [] rather than null; the Web UI iterates this field directly.
+	out := make([]Entry, 0)
 	for _, info := range infos {
 		doc := info.Doc
 		if doc == nil || doc.Lifecycle == extract.LifecycleStale {

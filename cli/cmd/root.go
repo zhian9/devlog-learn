@@ -36,6 +36,7 @@ Commands:
   index     build global and per-project index.json/README.md
   search    search active Docs from the terminal
   projects  list projects and their review counts
+  experience aggregate Docs into project/internship experience + review checklist
   status    read-only health report for cache, cursor, and outputs
   questions list open questions or mark one resolved
   related   show read-only related documents for one Doc
@@ -71,6 +72,7 @@ current directory. Explicit flags always win.`,
 	cmd.AddCommand(newIndexCmd())
 	cmd.AddCommand(newSearchCmd())
 	cmd.AddCommand(newProjectsCmd())
+	cmd.AddCommand(newExperienceCmd())
 	cmd.AddCommand(newStatusCmd())
 	cmd.AddCommand(newQuestionsCmd())
 	cmd.AddCommand(newRelatedCmd())
