@@ -114,12 +114,14 @@ type Experience struct {
 	ProjectPath string   `json:"project_path,omitempty"`
 	Paths       []string `json:"paths"`
 
-	Kind         string `json:"kind"`
-	KindLabel    string `json:"kind_label"`
-	KindSource   string `json:"kind_source"`
-	Organization string `json:"organization,omitempty"`
-	Role         string `json:"role,omitempty"`
-	Headline     string `json:"headline,omitempty"`
+	Kind         string   `json:"kind"`
+	KindLabel    string   `json:"kind_label"`
+	KindSource   string   `json:"kind_source"`
+	Organization string   `json:"organization,omitempty"`
+	Role         string   `json:"role,omitempty"`
+	Headline     string   `json:"headline,omitempty"`
+	Overview     string   `json:"overview,omitempty"`
+	Files        []string `json:"files"`
 
 	Start  time.Time `json:"start,omitzero"`
 	End    time.Time `json:"end,omitzero"`
@@ -354,6 +356,7 @@ func buildOne(project string, docs []*extract.Doc, info pathInfo, state *State) 
 	exp := Experience{
 		Project:         project,
 		Paths:           nonNilStrings(info.cwds),
+		Files:           []string{},
 		Timeline:        []TimelineEntry{},
 		Highlights:      []Highlight{},
 		Challenges:      []Highlight{},
@@ -474,15 +477,27 @@ func buildOne(project string, docs []*extract.Doc, info pathInfo, state *State) 
 		}
 	}
 
-	ranked := rankDocs(docs)
+	substantive := make([]*extract.Doc, 0, len(docs))
+	for _, doc := range docs {
+		if isSubstantive(doc) {
+			substantive = append(substantive, doc)
+		}
+	}
+	if len(substantive) == 0 && len(docs) > 0 {
+		exp.Warnings = append(exp.Warnings, "没有检测到实质工作文档（缺少命令、文件改动或诊断）；关键工作与建模内容将为空")
+	}
+
+	ranked := rankDocs(substantive)
 	exp.Highlights = buildHighlights(ranked, maxHighlights)
 	exp.Challenges = buildChallenges(ranked, maxChallenges)
-	exp.Outcomes = buildOutcomes(len(docs), resolved, followUp, unknownStatus, typeCount,
-		approved, pending, rejected, evidenceVerified, evidenceChecked)
-	exp.Lessons = collectLessons(docs, maxLessons)
-	exp.BlindSpots = collectBlindSpots(docs, maxBlindSpots)
-	exp.Stories = buildStories(ranked, 3)
+	exp.Stories = buildStories(ranked, 2)
+	exp.Lessons = collectLessons(substantive, maxLessons)
+	exp.BlindSpots = collectBlindSpots(substantive, maxBlindSpots)
+	exp.Files = collectFiles(substantive, 12)
 	exp.ReviewChecklist = buildChecklist(project, ranked, exp.Kind)
+	exp.Overview = buildOverview(len(docs), len(substantive), exp.Period, exp.Stack, resolved, followUp, fileCount(exp.Files))
+	exp.Outcomes = buildOutcomes(len(docs), len(substantive), resolved, followUp, unknownStatus, typeCount,
+		approved, pending, rejected, evidenceVerified, evidenceChecked)
 
 	if exp.Docs == 0 {
 		exp.Warnings = append(exp.Warnings, "该项目没有可用的 active 文档")
@@ -588,19 +603,32 @@ func buildHighlights(ranked []*extract.Doc, limit int) []Highlight {
 		if len(out) >= limit {
 			break
 		}
-		text := strings.TrimSpace(doc.Title)
-		if summary := strings.TrimSpace(doc.Summary); summary != "" {
+		title := strings.TrimSpace(doc.Title)
+		detail := firstSentence(doc.Summary, 140)
+		if detail == "" {
+			for _, step := range doc.Solution {
+				if action := strings.TrimSpace(step.Action); meaningful(action) {
+					detail = truncateRunes(action, 140)
+					break
+				}
+			}
+		}
+		if detail == "" && meaningful(doc.Problem.Statement) {
+			detail = firstSentence(doc.Problem.Statement, 140)
+		}
+		text := title
+		if detail != "" {
 			if text == "" {
-				text = summary
+				text = detail
 			} else {
-				text += "：" + summary
+				text += "：" + detail
 			}
 		}
 		if text == "" {
 			continue
 		}
 		out = append(out, Highlight{
-			Text:         truncateRunes(text, 300),
+			Text:         truncateRunes(text, 220),
 			DocIDs:       []string{doc.ID},
 			EvidenceSeen: doc.Validation.EvidenceVerified,
 		})
@@ -617,21 +645,12 @@ func buildChallenges(ranked []*extract.Doc, limit int) []Highlight {
 		if !isChallenge(doc) {
 			continue
 		}
-		text := strings.TrimSpace(doc.RootCause.Text)
-		if text == "" && len(doc.Pitfalls) > 0 {
-			text = strings.TrimSpace(doc.Pitfalls[0].Trap)
-		}
-		if text == "" {
-			text = strings.TrimSpace(doc.Problem.Statement)
-		}
-		if text == "" {
-			text = strings.TrimSpace(doc.Title)
-		}
+		text := challengeText(doc)
 		if text == "" {
 			continue
 		}
 		out = append(out, Highlight{
-			Text:         truncateRunes(text, 300),
+			Text:         text,
 			DocIDs:       []string{doc.ID},
 			EvidenceSeen: doc.Validation.EvidenceVerified,
 		})
@@ -639,7 +658,29 @@ func buildChallenges(ranked []*extract.Doc, limit int) []Highlight {
 	return out
 }
 
+func challengeText(doc *extract.Doc) string {
+	candidates := []string{
+		doc.RootCause.Text,
+		firstPitfall(doc),
+		doc.Problem.Statement,
+		firstRejectedHypothesis(doc),
+		firstBlindSpot(doc),
+	}
+	for _, candidate := range candidates {
+		if meaningful(candidate) {
+			return truncateRunes(strings.TrimSpace(candidate), 220)
+		}
+	}
+	return ""
+}
+
 func isChallenge(doc *extract.Doc) bool {
+	if doc == nil {
+		return false
+	}
+	if !meaningful(challengeText(doc)) {
+		return false
+	}
 	if strings.EqualFold(strings.TrimSpace(doc.Difficulty), "high") {
 		return true
 	}
@@ -647,16 +688,56 @@ func isChallenge(doc *extract.Doc) bool {
 	case "unresolved", "workaround":
 		return true
 	}
-	if doc.RootCause.Known || strings.TrimSpace(doc.RootCause.Text) != "" {
+	if doc.RootCause.Known && meaningful(doc.RootCause.Text) {
 		return true
 	}
-	return len(doc.Pitfalls) > 0
+	if meaningful(firstPitfall(doc)) {
+		return true
+	}
+	return meaningful(firstRejectedHypothesis(doc))
 }
 
-func buildOutcomes(docs, resolved, followUp, unknownStatus int, typeCount map[string]int,
+func firstPitfall(doc *extract.Doc) string {
+	if doc == nil {
+		return ""
+	}
+	for _, pitfall := range doc.Pitfalls {
+		if trap := strings.TrimSpace(pitfall.Trap); meaningful(trap) {
+			return trap
+		}
+	}
+	return ""
+}
+
+func firstRejectedHypothesis(doc *extract.Doc) string {
+	if doc == nil {
+		return ""
+	}
+	for _, rejected := range doc.RejectedHypotheses {
+		if hypothesis := strings.TrimSpace(rejected.Hypothesis); meaningful(hypothesis) {
+			return hypothesis
+		}
+	}
+	return ""
+}
+
+func firstBlindSpot(doc *extract.Doc) string {
+	if doc == nil {
+		return ""
+	}
+	for _, spot := range doc.BlindSpots {
+		if point := strings.TrimSpace(spot.Point); meaningful(point) {
+			return point
+		}
+	}
+	return ""
+}
+
+func buildOutcomes(docs, substantive, resolved, followUp, unknownStatus int, typeCount map[string]int,
 	approved, pending, rejected, evidenceVerified, evidenceChecked int) []string {
 	out := []string{
-		fmt.Sprintf("文档 %d 篇：已解决 %d，待跟进 %d，状态未知 %d", docs, resolved, followUp, unknownStatus),
+		fmt.Sprintf("文档 %d 篇，其中可复核工作文档 %d 篇；已解决 %d，待跟进 %d，状态未知 %d",
+			docs, substantive, resolved, followUp, unknownStatus),
 		fmt.Sprintf("人工审核：通过 %d，待审 %d，驳回 %d", approved, pending, rejected),
 	}
 	if evidenceChecked > 0 {
@@ -683,23 +764,22 @@ func buildStories(ranked []*extract.Doc, limit int) []Highlight {
 		if len(out) >= limit {
 			break
 		}
-		problem := strings.TrimSpace(doc.Problem.Statement)
+		problem := strings.TrimRight(firstSentence(doc.Problem.Statement, 160), "。；; ")
 		actions := make([]string, 0, 3)
 		for _, step := range doc.Solution {
-			if action := strings.TrimSpace(step.Action); action != "" {
-				actions = append(actions, action)
+			action := strings.TrimSpace(step.Action)
+			if !meaningful(action) {
+				continue
 			}
+			actions = append(actions, truncateRunes(action, 120))
 			if len(actions) >= 3 {
 				break
 			}
 		}
-		result := strings.TrimSpace(doc.RootCause.Text)
-		if result == "" {
-			result = strings.TrimSpace(doc.Status)
-		}
 		if problem == "" && len(actions) == 0 {
 			continue
 		}
+		result := storyResult(doc)
 		var b strings.Builder
 		if problem != "" {
 			b.WriteString("背景/任务：")
@@ -720,12 +800,35 @@ func buildStories(ranked []*extract.Doc, limit int) []Highlight {
 			b.WriteString(result)
 		}
 		out = append(out, Highlight{
-			Text:         truncateRunes(b.String(), 500),
+			Text:         truncateRunes(b.String(), 420),
 			DocIDs:       []string{doc.ID},
 			EvidenceSeen: doc.Validation.EvidenceVerified,
 		})
 	}
 	return out
+}
+
+func storyResult(doc *extract.Doc) string {
+	if doc == nil {
+		return ""
+	}
+	for _, check := range doc.Verification {
+		if strings.EqualFold(strings.TrimSpace(check.Status), "passed") && meaningful(check.Check) {
+			return "已验证：" + truncateRunes(strings.TrimSpace(check.Check), 160)
+		}
+	}
+	if meaningful(doc.RootCause.Text) {
+		return truncateRunes(strings.TrimSpace(doc.RootCause.Text), 160)
+	}
+	switch strings.ToLower(strings.TrimSpace(doc.Status)) {
+	case "resolved":
+		return "已解决"
+	case "workaround":
+		return "已有绕过方案"
+	case "unresolved":
+		return "仍未解决"
+	}
+	return "会话未记录明确的验证结果"
 }
 
 func collectLessons(docs []*extract.Doc, limit int) []string {
@@ -735,7 +838,7 @@ func collectLessons(docs []*extract.Doc, limit int) []string {
 		for _, lesson := range doc.Lessons {
 			lesson = strings.TrimSpace(lesson)
 			key := strings.ToLower(lesson)
-			if lesson == "" || seen[key] {
+			if !meaningful(lesson) || seen[key] {
 				continue
 			}
 			seen[key] = true
@@ -755,7 +858,7 @@ func collectBlindSpots(docs []*extract.Doc, limit int) []ReviewItem {
 		for _, spot := range doc.BlindSpots {
 			point := strings.TrimSpace(spot.Point)
 			key := strings.ToLower(point)
-			if point == "" || seen[key] {
+			if !meaningful(point) || seen[key] {
 				continue
 			}
 			seen[key] = true
@@ -811,31 +914,51 @@ func buildChecklist(project string, ranked []*extract.Doc, kind string) []Review
 		if title == "" {
 			title = doc.ID
 		}
-		if strings.TrimSpace(doc.RootCause.Text) != "" {
+		if meaningful(doc.RootCause.Text) {
 			add("root_cause", fmt.Sprintf("不看文档，讲清「%s」的根因与验证方法", title), doc.ID, title)
 		}
 		for n, concept := range doc.Concepts {
 			if n >= 2 {
 				break
 			}
-			add("concept", fmt.Sprintf("解释「%s」在本项目中的作用", strings.TrimSpace(concept.Name)), doc.ID, title)
+			name := strings.TrimSpace(concept.Name)
+			if !meaningful(name) {
+				continue
+			}
+			add("concept", fmt.Sprintf("解释「%s」在本项目中的作用", name), doc.ID, title)
 		}
 		for n, rejected := range doc.RejectedHypotheses {
 			if n >= 1 {
 				break
 			}
-			add("rejected_hypothesis", fmt.Sprintf("说明为什么排除「%s」", strings.TrimSpace(rejected.Hypothesis)), doc.ID, title)
+			hypothesis := strings.TrimSpace(rejected.Hypothesis)
+			if !meaningful(hypothesis) {
+				continue
+			}
+			add("rejected_hypothesis", fmt.Sprintf("说明为什么排除「%s」", hypothesis), doc.ID, title)
 		}
 		for _, spot := range doc.BlindSpots {
-			add("blind_spot", "补上："+strings.TrimSpace(spot.Point), doc.ID, title)
+			point := strings.TrimSpace(spot.Point)
+			if !meaningful(point) {
+				continue
+			}
+			add("blind_spot", "补上："+point, doc.ID, title)
 			break
 		}
 		for _, pitfall := range doc.Pitfalls {
-			add("pitfall", fmt.Sprintf("下次如何避免「%s」", strings.TrimSpace(pitfall.Trap)), doc.ID, title)
+			trap := strings.TrimSpace(pitfall.Trap)
+			if !meaningful(trap) {
+				continue
+			}
+			add("pitfall", fmt.Sprintf("下次如何避免「%s」", trap), doc.ID, title)
 			break
 		}
 		for _, question := range doc.OpenQuestions {
-			add("open_question", fmt.Sprintf("你能回答：「%s」吗", strings.TrimSpace(question)), doc.ID, title)
+			question = strings.TrimSpace(question)
+			if !meaningfulQuestion(question) {
+				continue
+			}
+			add("open_question", fmt.Sprintf("你能回答：「%s」吗", question), doc.ID, title)
 			break
 		}
 	}
@@ -1031,6 +1154,106 @@ func formatSpan(start, end time.Time) string {
 		return a
 	}
 	return a + " ~ " + b
+}
+
+func isSubstantive(doc *extract.Doc) bool {
+	if doc == nil {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(doc.LearningValue), "high") {
+		return true
+	}
+	if len(doc.Artifacts.Files) > 0 || len(doc.Artifacts.Commands) > 0 {
+		return true
+	}
+	if len(doc.Commands) > 0 || len(doc.Diagnosis) > 0 {
+		return true
+	}
+	if doc.Validation.EvidenceVerified >= 5 {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(doc.KnowledgeType)) {
+	case "bug_fix", "development", "refactoring", "architecture":
+		return len(doc.Solution) > 0 || meaningful(doc.RootCause.Text) || meaningful(firstPitfall(doc))
+	default:
+		return false
+	}
+}
+
+func meaningful(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "unknown", "none", "null", "n/a", "na", "undefined", "-", "未知", "无", "不适用":
+		return false
+	}
+	return true
+}
+
+func firstSentence(value string, limit int) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if value == "" {
+		return ""
+	}
+	for _, separator := range []string{"。", "！", "？", "；", ". "} {
+		if index := strings.Index(value, separator); index >= 0 {
+			return truncateRunes(value[:index+len(separator)], limit)
+		}
+	}
+	return truncateRunes(value, limit)
+}
+
+func meaningfulQuestion(question string) bool {
+	if !meaningful(question) || len([]rune(question)) < 8 {
+		return false
+	}
+	lower := strings.ToLower(question)
+	for _, noise := range []string{"transcript", "无证据", "未记录", "无法判断", "是否被实际采纳", "无明确证据"} {
+		if strings.Contains(lower, noise) {
+			return false
+		}
+	}
+	return true
+}
+
+func collectFiles(docs []*extract.Doc, limit int) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, limit)
+	for _, doc := range docs {
+		for _, file := range doc.Artifacts.Files {
+			file = strings.TrimSpace(file)
+			key := strings.ToLower(file)
+			if file == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, file)
+			if len(out) >= limit {
+				return out
+			}
+		}
+	}
+	return out
+}
+
+func buildOverview(docs, substantive int, period string, stack []string, resolved, followUp, files int) string {
+	parts := make([]string, 0, 5)
+	if period != "" {
+		parts = append(parts, period+" 期间")
+	}
+	parts = append(parts, fmt.Sprintf("共 %d 篇文档，其中 %d 篇包含可复核的工作内容", docs, substantive))
+	if len(stack) > 0 {
+		parts = append(parts, "主要技术栈 "+strings.Join(stack, "、"))
+	}
+	if resolved > 0 || followUp > 0 {
+		parts = append(parts, fmt.Sprintf("已解决 %d 项，待跟进 %d 项", resolved, followUp))
+	}
+	if files > 0 {
+		parts = append(parts, fmt.Sprintf("涉及 %d 个文件", files))
+	}
+	return strings.Join(parts, "；") + "。"
+}
+
+func fileCount(files []string) int {
+	return len(files)
 }
 
 func truncateRunes(value string, limit int) string {

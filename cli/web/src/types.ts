@@ -574,6 +574,8 @@ export interface Experience {
   organization?: string
   role?: string
   headline?: string
+  overview?: string
+  files: string[]
   start?: string
   end?: string
   period?: string

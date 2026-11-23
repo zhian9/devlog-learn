@@ -3053,6 +3053,12 @@ button.tag:hover {
   color: var(--ink);
 }
 
+.experience-overview {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
 .experience-detail .meta-list span {
   color: var(--muted);
 }

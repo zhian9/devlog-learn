@@ -78,6 +78,7 @@ func ExperienceMarkdown(exp *experience.Experience, docPaths map[string]string) 
 	writeYAMLString(&b, "period", exp.Period)
 	fmt.Fprintf(&b, "documents: %d\n", exp.Docs)
 	fmt.Fprintf(&b, "sessions: %d\n", exp.Sessions)
+	fmt.Fprintf(&b, "files: %d\n", len(exp.Files))
 	writeYAMLList(&b, "sources", exp.Sources)
 	writeYAMLList(&b, "stack", exp.Stack)
 	b.WriteString("---\n\n")
@@ -98,9 +99,15 @@ func ExperienceMarkdown(exp *experience.Experience, docPaths map[string]string) 
 		b.WriteString(blockquote(headline))
 		b.WriteString("\n")
 	}
+	if overview := strings.TrimSpace(exp.Overview); overview != "" {
+		b.WriteString("\n## 项目概览\n\n")
+		b.WriteString(oneLine(overview, ""))
+		b.WriteString("\n")
+	}
 
 	writeExperienceOverview(&b, exp)
 	writeExperienceStack(&b, exp)
+	writeExperienceFiles(&b, exp.Files)
 	writeExperienceHighlights(&b, "关键工作", exp.Highlights, docPaths)
 	writeExperienceHighlights(&b, "难点与解决", exp.Challenges, docPaths)
 	writeExperienceBullets(&b, "结果与数据", exp.Outcomes)
@@ -152,6 +159,19 @@ func writeExperienceStack(b *strings.Builder, exp *experience.Experience) {
 			b.WriteString(" · ")
 		}
 		b.WriteString(item)
+	}
+	b.WriteString("\n")
+}
+
+func writeExperienceFiles(b *strings.Builder, files []string) {
+	if len(files) == 0 {
+		return
+	}
+	b.WriteString("\n## 涉及文件\n\n")
+	for _, file := range files {
+		if file = strings.TrimSpace(file); file != "" {
+			fmt.Fprintf(b, "- `%s`\n", file)
+		}
 	}
 	b.WriteString("\n")
 }

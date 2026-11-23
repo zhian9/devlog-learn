@@ -160,6 +160,7 @@ function ExperienceDetail({ experience }: { experience: Experience }) {
       </div>
 
       {experience.headline && <blockquote className="experience-headline">{experience.headline}</blockquote>}
+      {experience.overview && <p className="experience-overview">{experience.overview}</p>}
 
       {(experience.organization || experience.role || experience.paths.length > 0) && (
         <div className="meta-list">
@@ -200,6 +201,17 @@ function ExperienceDetail({ experience }: { experience: Experience }) {
 
       {experience.synthesized && <SynthesisPanel synthesis={experience.synthesized} />}
 
+      {experience.files.length > 0 && (
+        <Section title="涉及文件">
+          <ul className="experience-bullets">
+            {experience.files.map((file) => (
+              <li key={file}>
+                <code>{file}</code>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
       {experience.highlights.length > 0 && (
         <Section title="关键工作">
           <HighlightList items={experience.highlights} />

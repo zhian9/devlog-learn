@@ -18,6 +18,8 @@ func experienceFixture(kind string) experience.Experience {
 		Organization: "ACME",
 		Role:         "Backend Intern",
 		Headline:     "Built the demo service",
+		Overview:     "2025-07 期间；共 2 篇文档，其中 1 篇包含可复核的工作内容。",
+		Files:        []string{"main.go"},
 		Period:       "2025-07 ~ 2025-09",
 		Docs:         2,
 		Sessions:     2,
@@ -51,6 +53,9 @@ func TestExperienceMarkdownProjectAndInternship(t *testing.T) {
 	}
 	if !strings.Contains(project, "- [ ] 讲清根因") {
 		t.Fatalf("checklist missing:\n%s", project)
+	}
+	if !strings.Contains(project, "## 项目概览") || !strings.Contains(project, "## 涉及文件") {
+		t.Fatalf("overview/files missing:\n%s", project)
 	}
 	if strings.Contains(project, "## 模型补充（未验证）") {
 		t.Fatal("synthesis section rendered without synthesis")

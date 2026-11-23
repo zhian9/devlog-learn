@@ -44,6 +44,7 @@ func testDoc(id, project, title string, at time.Time) *extract.Doc {
 		Pitfalls:      []extract.Pitfall{{Trap: "stale cache", Why: "cache not invalidated", Avoid: "clear cache"}},
 		Lessons:       []string{"measure before optimizing"},
 		OpenQuestions: []string{"why did CI miss it?"},
+		Artifacts:     extract.Artifacts{Files: []string{"main.go"}},
 		Validation:    extract.Validation{EvidenceChecked: 2, EvidenceVerified: 2},
 		Provenance: extract.Provenance{
 			SessionID:   "session-" + id,
@@ -123,10 +124,68 @@ func TestBuildGroupsDocsAndSuggestsKind(t *testing.T) {
 	if len(exp.ReviewChecklist) == 0 {
 		t.Fatal("checklist is empty")
 	}
+	if exp.Overview == "" {
+		t.Fatal("overview is empty")
+	}
+	if len(exp.Files) == 0 || exp.Files[0] != "main.go" {
+		t.Fatalf("files = %+v", exp.Files)
+	}
 	for _, item := range exp.ReviewChecklist {
 		if !strings.HasPrefix(item.ID, "ex_") {
 			t.Fatalf("unstable checklist id %q", item.ID)
 		}
+	}
+}
+
+func TestTrivialDocsAreExcludedFromNarrative(t *testing.T) {
+	substantive := testDoc("d1", "demo", "Implement timer", testTime)
+	trivial := testDoc("d2", "demo", "Name the session", testTime.Add(time.Hour))
+	trivial.KnowledgeType = "decision"
+	trivial.LearningValue = ""
+	trivial.Difficulty = "low"
+	trivial.Solution = []extract.Step{{Order: 1, Action: "extract keywords"}}
+	trivial.Artifacts = extract.Artifacts{}
+	trivial.Commands = nil
+	trivial.Diagnosis = nil
+	trivial.RootCause = extract.RootCause{Text: "unknown"}
+	trivial.Concepts = nil
+	trivial.RejectedHypotheses = nil
+	trivial.BlindSpots = nil
+	trivial.Pitfalls = nil
+	trivial.Lessons = []string{"naming only"}
+	trivial.Validation = extract.Validation{EvidenceChecked: 2, EvidenceVerified: 2}
+
+	store := seedExperienceStore(t, []*extract.Doc{substantive, trivial}, nil)
+	exp := Build(infosFor(t, store), store, NewState(), testTime)[0]
+	if exp.Docs != 2 {
+		t.Fatalf("docs = %d", exp.Docs)
+	}
+	if len(exp.Highlights) != 1 || len(exp.Highlights[0].DocIDs) != 1 || exp.Highlights[0].DocIDs[0] != "d1" {
+		t.Fatalf("highlights = %+v", exp.Highlights)
+	}
+	if len(exp.Stories) != 1 || exp.Stories[0].DocIDs[0] != "d1" {
+		t.Fatalf("stories = %+v", exp.Stories)
+	}
+	for _, challenge := range exp.Challenges {
+		if strings.EqualFold(strings.TrimSpace(challenge.Text), "unknown") {
+			t.Fatalf("challenge contains unknown: %+v", exp.Challenges)
+		}
+		if len(challenge.DocIDs) > 0 && challenge.DocIDs[0] == "d2" {
+			t.Fatalf("trivial doc leaked into challenges: %+v", exp.Challenges)
+		}
+	}
+	for _, lesson := range exp.Lessons {
+		if strings.Contains(lesson, "naming only") {
+			t.Fatalf("trivial lesson leaked: %+v", exp.Lessons)
+		}
+	}
+	for _, item := range exp.ReviewChecklist {
+		if item.DocID == "d2" {
+			t.Fatalf("trivial doc leaked into checklist: %+v", exp.ReviewChecklist)
+		}
+	}
+	if !strings.Contains(exp.Overview, "2") || !strings.Contains(exp.Overview, "1") {
+		t.Fatalf("overview = %q", exp.Overview)
 	}
 }
 
